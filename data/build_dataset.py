@@ -77,11 +77,11 @@ WITH base AS (
         -- normalise whitespace, drop Genius boilerplate lines
         regexp_replace(
             regexp_replace(lyrics, '(?m)^\\s*\\d*\\s*Contributors?.*$', ''),
-            '\\n{3,}', '\\n\\n', 'g'
+            '\\n{3,}', chr(10) || chr(10), 'g'
         )                                 AS lyrics
     FROM read_parquet($files)
     WHERE language IN ('en', 'el')
-      AND tag IN {genres}
+      AND tag IN __GENRES__
       AND year BETWEEN 1950 AND 2024
       AND length(lyrics) BETWEEN 300 AND 8000
       AND title IS NOT NULL AND artist IS NOT NULL
@@ -109,7 +109,7 @@ def build(n_en: int, n_el: int) -> None:
     files = [str(p) for p in download()]
     OUT.parent.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect()
-    sql = BUILD_SQL.format(genres=GENRES)
+    sql = BUILD_SQL.replace("__GENRES__", str(GENRES))
     con.execute(f"CREATE TABLE songs AS {sql}", {"files": files, "n_en": n_en, "n_el": n_el})
     con.execute(f"COPY songs TO '{OUT}' (FORMAT parquet, COMPRESSION zstd)")
     stats = con.execute(
