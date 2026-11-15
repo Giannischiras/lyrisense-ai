@@ -1,0 +1,44 @@
+# --- Secrets: NEVER commit ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# --- Data (lyrics are copyrighted; only download scripts are committed) ---
+data/raw/
+data/processed/
+*.parquet
+*.csv
+*.jsonl
+!evals/datasets/*.jsonl
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# --- Node ---
+node_modules/
+dist/
+.vite/
+
+# --- Models / training artefacts ---
+*.safetensors
+*.bin
+*.gguf
+checkpoints/
+wandb/
+
+# --- OS / editors ---
+.DS_Store
+Icon?
+.idea/
+.vscode/
