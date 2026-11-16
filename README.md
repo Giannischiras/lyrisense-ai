@@ -34,7 +34,7 @@ The database, the API and the UI all run on your machine. There's no server of m
 ## How to run it
 
 ```bash
-git clone https://github.com/Giannischiras/wavelength && cd wavelength
+git clone https://github.com/Giannischiras/wavelength-songfind-ai && cd wavelength-songfind-ai
 cp .env.example .env               # contains no secrets
 docker compose -f infra/docker-compose.yml up --build
 ```
