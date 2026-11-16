@@ -35,7 +35,7 @@ SETUPS = {
 
 
 def main() -> None:
-    golden = [json.loads(line) for line in (ROOT / "golden.jsonl").open()]
+    golden = [json.loads(line) for line in (ROOT / "datasets" / "golden.jsonl").open()]
     results = {}
     with connect() as conn:
         search(conn, "warmup", k=1)  # load the models once

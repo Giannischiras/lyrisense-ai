@@ -23,7 +23,7 @@ It's an AI music agent that runs on your own computer. It searches a big song da
 
 ## How good is the search?
 
-I wrote 58 test queries (`evals/golden.jsonl`, 49 English and 9 Greek). For each one I picked a song from the database and described its mood or story the way a user would, without using words from the title. Then I check where that song shows up in the top 10.
+I wrote 58 test queries (`evals/datasets/golden.jsonl`, 49 English and 9 Greek). For each one I picked a song from the database and described its mood or story the way a user would, without using words from the title. Then I check where that song shows up in the top 10.
 
 `cd backend && uv run python ../evals/run_retrieval.py`
 
