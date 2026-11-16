@@ -1,0 +1,13 @@
+{
+  "note": "58 golden queries, hybrid search over song + stanza chunks, measured on a MacBook CPU",
+  "setups": {
+    "bge-reranker-v2-m3-int8, 10 candidates": {"hit@1": 0.26, "hit@10": 0.31, "mrr": 0.282, "p50_s": 0.93},
+    "bge-reranker-v2-m3-int8, 30 candidates": {"hit@1": 0.29, "hit@10": 0.36, "mrr": 0.319, "p50_s": 3.08},
+    "bge-reranker-v2-m3-int8, 50 candidates": {"hit@1": 0.38, "hit@10": 0.45, "mrr": 0.403, "p50_s": 5.43},
+    "bge-reranker-v2-m3-int8, 50 candidates, docs cut to 250 chars": {"hit@1": 0.31, "hit@10": 0.41, "mrr": 0.347, "p50_s": 2.83},
+    "jina-reranker-v2-base-multilingual, 30 candidates": {"hit@1": 0.31, "hit@10": 0.36, "mrr": 0.336, "p50_s": 1.68},
+    "jina-reranker-v2-base-multilingual, 50 candidates, docs cut to 300 chars": {"hit@1": 0.33, "hit@10": 0.43, "mrr": 0.373, "p50_s": 1.41},
+    "jina-reranker-v2-base-multilingual, 50 candidates (default)": {"hit@1": 0.36, "hit@10": 0.47, "mrr": 0.408, "p50_s": 2.58},
+    "ms-marco-MiniLM-L-12-v2 (english only), 50 candidates": {"hit@1": 0.24, "hit@10": 0.34, "mrr": 0.279, "p50_s": 2.62}
+  }
+}

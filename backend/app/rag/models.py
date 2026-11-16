@@ -11,7 +11,9 @@ EMBED_MODEL = os.environ.get(
     "WAVELENGTH_EMBED_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 )
 EMBED_DIM = 384
-RERANK_MODEL = os.environ.get("WAVELENGTH_RERANK_MODEL", "BAAI/bge-reranker-v2-m3-int8")
+RERANK_MODEL = os.environ.get(
+    "WAVELENGTH_RERANK_MODEL", "jinaai/jina-reranker-v2-base-multilingual"
+)
 
 
 @lru_cache

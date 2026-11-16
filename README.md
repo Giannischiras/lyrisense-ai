@@ -43,7 +43,15 @@ What I learned:
 - Searching song chunks and stanza chunks together and letting the reranker pick gave the best result (MRR 0.27 → 0.40 after these changes).
 - I also tried 60 word windows with overlap, but they made about 500k chunks, which took hours to embed on my laptop CPU, so I dropped them.
 - Greek queries score higher (MRR 0.78) but there are only 9 of them and fewer Greek songs to choose from, so I don't trust that number much yet.
-- The downside is speed: the reranker looks at 50 candidates on CPU and a search takes about 4s. Making this faster is on my list.
+- Speed was the problem. I timed each step and the reranker was 97% of the search time (the vector and keyword parts take under 0.1s). Giving it fewer candidates made it faster but worse, so instead I tried other reranker models:
+
+| Reranker (50 candidates) | MRR | time per search |
+|---|---|---|
+| bge-reranker-v2-m3 (int8) | 0.40 | 5.4s |
+| jina-reranker-v2-base-multilingual | 0.41 | 2.6s |
+| ms-marco-MiniLM-L-12 (english only) | 0.28 | 2.6s |
+
+  I switched to the jina one: same quality, half the time, and it still understands Greek. Cutting the text it reads to 300 chars gets it to 1.4s but MRR drops to 0.37, so I kept the full text. All the runs are in `evals/results/reranker.json`.
 
 The full numbers are in `evals/results/retrieval.json`. The metric code has unit tests in CI. The eval itself needs the local database, so it doesn't run in CI.
 
