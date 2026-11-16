@@ -89,17 +89,6 @@ def _keyword(conn: Connection, query: str, f: Filters, n: int) -> list[int]:
         """,
         [query, *args, n],
     ).fetchall()
-    if not rows:  # OR-semantics fallback: any of the words
-        or_q = " or ".join(w for w in query.split() if len(w) > 2)
-        if or_q:
-            rows = conn.execute(
-                f"""
-                SELECT s.id FROM songs s, websearch_to_tsquery('simple', %s) q
-                WHERE s.tsv @@ q AND {where}
-                ORDER BY ts_rank_cd(s.tsv, q) DESC, s.views DESC LIMIT %s
-                """,
-                [or_q, *args, n],
-            ).fetchall()
     return [r[0] for r in rows]
 
 
@@ -132,8 +121,9 @@ def search(
     query: str,
     filters: Filters | None = None,
     k: int = 10,
-    strategy: str = "stanza",
+    strategy: str | tuple[str, ...] = ("song", "stanza"),
     candidates: int = 50,
+    rerank_pool: int = 50,
     use_keyword: bool = True,
     use_vector: bool = True,
     use_rerank: bool = True,
@@ -141,8 +131,19 @@ def search(
     f = filters or Filters()
     register_vector(conn)
     kw = _keyword(conn, query, f, candidates) if use_keyword else []
-    vec, snippets = _vector(conn, query, f, candidates, strategy) if use_vector else ([], {})
-    fused = rrf_fuse(*(r for r in (kw, vec) if r))
+    strategies = (strategy,) if isinstance(strategy, str) else strategy
+    vec_lists, snippets = [], {}
+    if use_vector:
+        for strat in strategies:
+            ranked, snips = _vector(conn, query, f, candidates, strat)
+            vec_lists.append(ranked)
+            for sid, text in snips.items():
+                snippets.setdefault(sid, text)
+    fused = rrf_fuse(*(r for r in (kw, *vec_lists) if r))
+    vec = sorted(
+        {sid for r in vec_lists for sid in r},
+        key=lambda sid: min(r.index(sid) if sid in r else 10**6 for r in vec_lists),
+    )
     top = sorted(fused, key=fused.get, reverse=True)[: max(candidates, k)]
     if not top:
         return []
@@ -173,9 +174,9 @@ def search(
         for sid in top
     ]
     if use_rerank:
-        pool = hits[:30]
+        pool = hits[:rerank_pool]
         docs = [f"{h.title} by {h.artist} ({h.genre}, {h.year}): {h.snippet}" for h in pool]
         for h, s in zip(pool, rerank(query, docs), strict=True):
             h.rerank_score = s
-        hits = sorted(pool, key=lambda h: h.rerank_score or 0, reverse=True) + hits[30:]
+        hits = sorted(pool, key=lambda h: h.rerank_score or 0, reverse=True) + hits[rerank_pool:]
     return hits[:k]
