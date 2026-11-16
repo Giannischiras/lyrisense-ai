@@ -1,35 +1,37 @@
 # Wavelength
 
-**Describe your mood, get a playlist and see who's playing live.** Wavelength is a local-first AI music agent. It searches a large song database with hybrid RAG, builds a playlist with an explanation for every track and, once you approve, creates it in your Spotify account. It can also find upcoming concerts by those artists.
+You tell it how you feel, it makes you a playlist and shows you if any of those artists are playing live soon.
 
-> 🚧 Work in progress. The checklist below is updated as each phase lands, with measured numbers.
+It's an AI music agent that runs on your own computer. It searches a big song database (hybrid RAG), picks songs and says why it picked each one, and if you approve, it creates the playlist in your Spotify. It can also look up upcoming concerts for the artists.
 
-## What it demonstrates
+> Still working on it. I update the list below as I finish each part, with the numbers I actually measured.
 
-| Area | Implementation | Status |
+## What's in it
+
+| Part | What I used | Status |
 |---|---|---|
-| Backend | Python, FastAPI, SSE streaming | 🟡 skeleton |
-| RAG | pgvector + Postgres full-text hybrid search, RRF fusion, local CPU embeddings + reranker, chunk-size experiments, citations | ⬜ |
-| LLM | Provider-swappable: Groq / Gemini (free tiers), Claude, OpenAI — user key held in RAM only | ⬜ |
-| Agent | LangGraph, multi-step planning, guardrails, human-in-the-loop approval, step logging | ⬜ |
-| MCP | `wavelength-mcp` server exposing the same tools to any MCP client | ⬜ |
-| Fine-tuning | QLoRA on a small open model (request → structured filters), base vs fine-tuned vs Claude | ⬜ |
-| Self-hosting | vLLM on free Kaggle GPUs, streaming, load test, cost per 1M tokens vs API | ⬜ |
-| Evaluation | golden set, retrieval hit@k/MRR, LLM-as-judge calibrated on human labels, prompt-injection suite, runs in CI | ⬜ |
-| Ops | Docker Compose (one command), GitHub Actions CI, local Phoenix tracing | 🟡 CI |
-| Frontend | React, TypeScript, Framer Motion | ⬜ |
+| Backend | Python, FastAPI, SSE streaming | started |
+| RAG | pgvector + Postgres full text search, RRF to merge them, embeddings and reranker on CPU, comparing chunk sizes, shows where each match came from | in progress |
+| LLM | you pick the provider: Groq / Gemini (free), Claude or OpenAI. your key only stays in RAM | not yet |
+| Agent | LangGraph, plans in steps, guardrails, asks you before doing anything, logs each step | not yet |
+| MCP | `wavelength-mcp` server so other MCP clients can use the same tools | not yet |
+| Fine-tuning | QLoRA on a small open model (turn a request into filters), base vs fine-tuned vs Claude | not yet |
+| Self-hosting | vLLM on free Kaggle GPUs, streaming, load test, cost per 1M tokens compared to an API | not yet |
+| Evals | test set, hit@k / MRR for retrieval, LLM-as-judge checked against my own labels, prompt injection tests, all in CI | not yet |
+| Ops | Docker Compose, GitHub Actions CI, Phoenix tracing locally | CI done |
+| Frontend | React, TypeScript, Framer Motion | not yet |
 
-## Local-first, zero-cost, nothing stored
+## Runs locally, free, stores nothing
 
-Wavelength runs **entirely on your machine**: the database, the API and the UI. There is no hosted server, so nothing you do passes through anyone else.
+The database, the API and the UI all run on your machine. There's no server of mine in the middle.
 
-- **Your LLM key stays in memory.** Choose a provider (Groq or Gemini on their free tiers, or Claude/OpenAI) and paste your own key into the UI. The local backend holds it in RAM for the session only. It is never written to disk, the database, logs or browser storage, and it is gone when you close the app.
-- **Your Spotify login stays in your browser.** You register your own free Spotify app (only the public Client ID is needed) and sign in with OAuth PKCE. The access token lives only in page memory. The agent proposes a playlist, and after you approve, your browser creates it directly through Spotify's API. The backend never sees the token.
-- **No accounts, no telemetry, no analytics.** The database holds songs and embeddings only, and tracing runs locally.
-- **€0.** Embeddings and reranking run on CPU with small open models. Fine-tuning and vLLM benchmarks were done once on free Kaggle GPUs, and the results are below.
-- Secret scanning (gitleaks) runs pre-commit and in CI, and tests assert that keys never appear in responses or logs.
+- Your LLM key: you pick a provider and paste your own key in the UI. The backend keeps it in RAM for that session and that's it. It doesn't get saved to disk, the database, the logs or the browser, and it's gone when you close the app.
+- Your Spotify login: you make your own free Spotify app (you only need the public Client ID) and log in with OAuth PKCE. The token stays in the page memory. The agent suggests a playlist, you approve it, and your browser creates it through the Spotify API. The backend never gets the token.
+- No accounts, no analytics. The database only has songs and embeddings, and tracing runs locally.
+- It costs €0. Embeddings and reranking run on CPU with small open models. I ran the fine-tuning and the vLLM tests once on free Kaggle GPUs and put the results below.
+- gitleaks checks for secrets before every commit and in CI, and there are tests that make sure keys never show up in responses or logs.
 
-## Run locally
+## How to run it
 
 ```bash
 git clone https://github.com/Giannischiras/wavelength && cd wavelength
@@ -37,13 +39,13 @@ cp .env.example .env               # contains no secrets
 docker compose -f infra/docker-compose.yml up --build
 ```
 
-Backend only:
+Only the backend:
 
 ```bash
 cd backend && uv sync && uv run uvicorn app.main:app --reload
 uv run pytest
 ```
 
-## Data & licensing
+## Data
 
-Song lyrics are copyrighted, so they are **not** included in this repository. `data/` contains only download and processing scripts. Run them to build your own local database.
+Song lyrics are copyrighted so I didn't put them in the repo. `data/` only has the scripts that download and clean them, so you can build the database yourself.
