@@ -1,4 +1,4 @@
-from app.rag.chunking import STRATEGIES, header, stanza_chunks, window_chunks
+from app.rag.chunking import STRATEGIES, header, stanza_chunks
 from app.rag.search import Filters, rrf_fuse
 
 LYRICS = """[Verse 1]
@@ -31,13 +31,6 @@ def test_stanza_chunks_drop_section_tags_and_dedupe_chorus():
     assert all("[" not in c for c in chunks)
     assert sum("Stay, stay" in c for c in chunks) == 1
     assert any("radio" in c for c in chunks)
-
-
-def test_window_overlap():
-    words = " ".join(f"w{i}" for i in range(130))
-    chunks = window_chunks(words, "h", size=60, overlap=15)
-    assert chunks[0].split()[-15:] == chunks[1].split()[:15]
-    assert "w129" in chunks[-1]
 
 
 def test_all_strategies_return_nonempty():

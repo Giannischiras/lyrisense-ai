@@ -2,7 +2,6 @@
 
 - song:   one chunk per song (header + opening lines; the encoder truncates at 128 tokens)
 - stanza: split on blank lines / [Section] headers, tiny stanzas merged
-- window: fixed word windows with overlap
 """
 
 from __future__ import annotations
@@ -48,16 +47,7 @@ def stanza_chunks(lyrics: str, head: str, min_words: int = 12, max_words: int = 
     return uniq or song_chunks(lyrics, head)
 
 
-def window_chunks(lyrics: str, head: str, size: int = 60, overlap: int = 15) -> list[str]:
-    words = _clean(lyrics).split()
-    if not words:
-        return []
-    step = size - overlap
-    return [" ".join(words[i : i + size]) for i in range(0, max(len(words) - overlap, 1), step)]
-
-
 STRATEGIES: dict[str, Callable[[str, str], list[str]]] = {
     "song": song_chunks,
     "stanza": stanza_chunks,
-    "window": window_chunks,
 }

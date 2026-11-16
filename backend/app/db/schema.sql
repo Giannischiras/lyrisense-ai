@@ -28,7 +28,7 @@ CREATE INDEX IF NOT EXISTS songs_artist_trgm  ON songs USING GIN (artist gin_trg
 CREATE INDEX IF NOT EXISTS songs_title_trgm   ON songs USING GIN (title gin_trgm_ops);
 
 -- Vector side of hybrid search. One row per chunk; `strategy` lets us compare
--- chunking schemes (song / stanza / window) on the same songs.
+-- chunking schemes (song / stanza) on the same songs.
 CREATE TABLE IF NOT EXISTS chunks (
     id        BIGSERIAL PRIMARY KEY,
     song_id   BIGINT NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
@@ -41,4 +41,3 @@ CREATE TABLE IF NOT EXISTS chunks (
 CREATE INDEX IF NOT EXISTS chunks_song_idx ON chunks (song_id);
 CREATE INDEX IF NOT EXISTS chunks_hnsw_song   ON chunks USING hnsw (embedding vector_cosine_ops) WHERE strategy = 'song';
 CREATE INDEX IF NOT EXISTS chunks_hnsw_stanza ON chunks USING hnsw (embedding vector_cosine_ops) WHERE strategy = 'stanza';
-CREATE INDEX IF NOT EXISTS chunks_hnsw_window ON chunks USING hnsw (embedding vector_cosine_ops) WHERE strategy = 'window';
