@@ -42,3 +42,6 @@ wandb/
 Icon?
 .idea/
 .vscode/
+
+# understand-anything graph (local only)
+.ua/
