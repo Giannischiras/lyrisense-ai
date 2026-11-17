@@ -10,7 +10,7 @@ It's an AI music agent that runs on your own computer. It searches a big song da
 
 | Part | What I used | Status |
 |---|---|---|
-| Backend | Python, FastAPI, SSE streaming | started |
+| Backend | Python, FastAPI, SSE streaming | done |
 | RAG | pgvector + Postgres full text search, RRF to merge them, embeddings and reranker on CPU, whole song vs stanza chunks, shows where each match came from | done (numbers below) |
 | LLM | you pick the provider: Groq / Gemini (free), Claude or OpenAI. your key only stays in RAM | done |
 | Agent | LangGraph, plans in steps, guardrails, asks you before doing anything, logs each step | first version done |
@@ -19,7 +19,7 @@ It's an AI music agent that runs on your own computer. It searches a big song da
 | Self-hosting | vLLM on free Kaggle GPUs, streaming, load test, cost per 1M tokens compared to an API | not yet |
 | Evals | test set, hit@k / MRR for retrieval, LLM-as-judge checked against my own labels, prompt injection tests, all in CI | retrieval done, the LLM parts come with the agent |
 | Ops | Docker Compose, GitHub Actions CI, Phoenix tracing locally | done |
-| Frontend | React, TypeScript, Framer Motion | not yet |
+| Frontend | React, TypeScript, Tailwind, Framer Motion, live agent steps over SSE | first version done |
 
 ## The agent
 
@@ -99,6 +99,13 @@ The database, the API and the UI all run on your machine. There's no server of m
 git clone https://github.com/Giannischiras/wavelength-songfind-ai && cd wavelength-songfind-ai
 cp .env.example .env               # contains no secrets
 docker compose -f infra/docker-compose.yml up --build
+```
+
+Or run the two parts yourself:
+
+```bash
+cd backend && uv run uvicorn app.main:app --port 8000   # API, logs every step and LLM call
+cd frontend && npm install && npm run dev               # UI on http://localhost:5173
 ```
 
 Only the backend:

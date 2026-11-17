@@ -12,7 +12,7 @@ returns and the UI can show. Steps never contain keys or tokens.
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -20,6 +20,7 @@ from langgraph.graph import END, START, StateGraph
 from app.agent.guardrails import check_picks, clean_user_text, untrusted
 from app.agent.llm import LLM, complete_json
 from app.agent.schemas import CuratedPlaylist, PlaylistRequest
+from app.log import llm_calls, log
 from app.rag.search import Filters, Hit
 from app.tracing import tracer
 
@@ -59,6 +60,16 @@ class AgentState(TypedDict, total=False):
 
 def _step(state: AgentState, name: str, t0: float, **info: Any) -> list[dict]:
     entry = {"step": name, "ms": round((time.perf_counter() - t0) * 1000), **info}
+    calls = llm_calls.get()
+    if calls:
+        entry["llm_calls"] = list(calls)
+        calls.clear()
+    log.info(
+        "step %-13s %6d ms  %s",
+        name,
+        entry["ms"],
+        {k: v for k, v in info.items() if k != "request"} or "",
+    )
     return [*state.get("steps", []), entry]
 
 
@@ -185,15 +196,38 @@ def build_agent(llm: LLM, search_fn: SearchFn):
     return g.compile()
 
 
-def run_agent(llm: LLM, search_fn: SearchFn, user_text: str) -> dict:
-    with tracer().start_as_current_span("agent") as span:
-        span.set_attribute("provider", llm.name)
-        final = build_agent(llm, search_fn).invoke({"user_text": user_text, "steps": []})
-        playlist = final.get("playlist")
-        span.set_attribute("songs", len(final.get("picks", [])))
+def _result(final: AgentState) -> dict:
+    playlist = final.get("playlist")
     return {
         "title": playlist.title if playlist else None,
         "songs": final.get("picks", []),
         "request": final["request"].model_dump() if final.get("request") else None,
         "steps": final.get("steps", []),
     }
+
+
+def stream_agent(llm: LLM, search_fn: SearchFn, user_text: str) -> Iterator[dict]:
+    """Same as run_agent but yields each step as soon as it's done, then the result."""
+    state: AgentState = {"user_text": user_text, "steps": []}
+    llm_calls.set([])
+    log.info("agent start provider=%s message_chars=%d", llm.name, len(user_text))
+    with tracer().start_as_current_span("agent") as span:
+        span.set_attribute("provider", llm.name)
+        graph = build_agent(llm, search_fn)
+        for update in graph.stream(state, stream_mode="updates"):
+            for _node, changes in update.items():
+                state.update(changes or {})
+                if changes and changes.get("steps"):
+                    yield {"type": "step", **changes["steps"][-1]}
+        span.set_attribute("songs", len(state.get("picks", [])))
+    log.info("agent done songs=%d", len(state.get("picks", [])))
+    yield {"type": "result", **_result(state)}
+
+
+def run_agent(llm: LLM, search_fn: SearchFn, user_text: str) -> dict:
+    llm_calls.set([])
+    with tracer().start_as_current_span("agent") as span:
+        span.set_attribute("provider", llm.name)
+        final = build_agent(llm, search_fn).invoke({"user_text": user_text, "steps": []})
+        span.set_attribute("songs", len(final.get("picks", [])))
+    return _result(final)

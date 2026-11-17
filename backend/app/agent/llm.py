@@ -10,14 +10,28 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from typing import Protocol
 
 from pydantic import BaseModel, ValidationError
 
+from app.log import llm_calls, log
+
 OPENAI_COMPAT = {
-    "groq": ("https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
-    "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/", "gemini-2.5-flash"),
-    "openai": (None, "gpt-4o-mini"),
+    "groq": "https://api.groq.com/openai/v1",
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/",
+    "openai": None,
+}
+# first one the key has access to wins (model names change, so we check the list)
+PREFERRED = {
+    "groq": [
+        "openai/gpt-oss-120b",
+        "llama-3.3-70b-versatile",
+        "openai/gpt-oss-20b",
+        "llama-3.1-8b-instant",
+    ],
+    "gemini": ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"],
+    "openai": ["gpt-4.1-mini", "gpt-4o-mini", "gpt-4.1", "gpt-4o"],
 }
 ANTHROPIC_MODEL = "claude-opus-5-5"
 PROVIDERS = (*OPENAI_COMPAT, "anthropic")
@@ -31,6 +45,21 @@ class LLM(Protocol):
     name: str
 
     def complete(self, system: str, user: str) -> str: ...
+
+
+def _record(provider: str, model: str, t0: float, prompt_chars: int, reply_chars: int) -> None:
+    ms = round((time.perf_counter() - t0) * 1000)
+    log.info(
+        "llm call  provider=%s model=%s ms=%d in=%d chars out=%d chars",
+        provider,
+        model,
+        ms,
+        prompt_chars,
+        reply_chars,
+    )
+    calls = llm_calls.get()
+    if calls is not None:
+        calls.append({"model": model, "ms": ms})
 
 
 def parse_json[T: BaseModel](text: str, model: type[T]) -> T:
@@ -62,19 +91,53 @@ class OpenAICompatLLM:
     def __init__(self, provider: str, api_key: str, model: str | None = None) -> None:
         from openai import OpenAI
 
-        base_url, default_model = OPENAI_COMPAT[provider]
         self.name = provider
-        self.model = model or default_model
-        self._client = OpenAI(api_key=api_key, base_url=base_url, timeout=60, max_retries=2)
+        self.model = model
+        self._client = OpenAI(
+            api_key=api_key, base_url=OPENAI_COMPAT[provider], timeout=60, max_retries=1
+        )
+
+    def _pick_model(self) -> str:
+        import openai
+
+        try:
+            available = {m.id.removeprefix("models/") for m in self._client.models.list()}
+        except openai.AuthenticationError as e:
+            raise LLMError(f"{self.name} rejected the API key") from e
+        except openai.APIError as e:
+            raise LLMError(f"could not list {self.name} models: {e}") from e
+        for m in PREFERRED[self.name]:
+            if m in available:
+                return m
+        raise LLMError(f"none of the usual {self.name} models are enabled for this key")
 
     def complete(self, system: str, user: str) -> str:
-        r = self._client.chat.completions.create(
-            model=self.model,
-            temperature=0.3,
-            response_format={"type": "json_object"},
-            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-        )
-        return r.choices[0].message.content or ""
+        import openai
+
+        if self.model is None:
+            self.model = self._pick_model()
+            log.info("using model %s for %s", self.model, self.name)
+        t0 = time.perf_counter()
+        try:
+            r = self._client.chat.completions.create(
+                model=self.model,
+                temperature=0.3,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            )
+        except openai.APIStatusError as e:
+            log.warning(
+                "llm error provider=%s model=%s status=%s", self.name, self.model, e.status_code
+            )
+            raise LLMError(f"{self.name} returned {e.status_code}: {e.message}") from e
+        except openai.APIError as e:
+            raise LLMError(f"{self.name} request failed: {e}") from e
+        text = r.choices[0].message.content or ""
+        _record(self.name, self.model, t0, len(system) + len(user), len(text))
+        return text
 
 
 class AnthropicLLM:
@@ -86,19 +149,29 @@ class AnthropicLLM:
         self._client = anthropic.Anthropic(api_key=api_key, timeout=120, max_retries=2)
 
     def complete(self, system: str, user: str) -> str:
-        # fallbacks="default": if the model declines, the API retries on a fallback model
-        r = self._client.beta.messages.create(
-            model=self.model,
-            max_tokens=16000,
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
-            output_config={"effort": "low"},
-            system=system,
-            messages=[{"role": "user", "content": user}],
-        )
+        import anthropic
+
+        t0 = time.perf_counter()
+        try:
+            # fallbacks="default": if the model declines, the API retries on a fallback model
+            r = self._client.beta.messages.create(
+                model=self.model,
+                max_tokens=16000,
+                betas=["server-side-fallback-2026-07-01"],
+                fallbacks="default",
+                output_config={"effort": "low"},
+                system=system,
+                messages=[{"role": "user", "content": user}],
+            )
+        except anthropic.APIStatusError as e:
+            raise LLMError(f"anthropic returned {e.status_code}: {e.message}") from e
+        except anthropic.APIError as e:
+            raise LLMError(f"anthropic request failed: {e}") from e
         if r.stop_reason == "refusal":
             raise LLMError("the model declined this request")
-        return "".join(b.text for b in r.content if b.type == "text")
+        text = "".join(b.text for b in r.content if b.type == "text")
+        _record(self.name, self.model, t0, len(system) + len(user), len(text))
+        return text
 
 
 def make_llm(provider: str, api_key: str, model: str | None = None) -> LLM:

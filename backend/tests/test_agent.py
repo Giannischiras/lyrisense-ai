@@ -133,3 +133,11 @@ def test_endpoint_needs_a_key():
         headers={"X-Session-Id": sid},
     )
     assert r.status_code == 422
+
+
+def test_stream_yields_steps_then_result():
+    llm = FakeLLM([understand_reply(), curate_reply([1, 2, 6])])
+    events = list(graph.stream_agent(llm, fake_search([CANDIDATES]), "rain"))
+    assert [e["type"] for e in events] == ["step", "step", "step", "step", "result"]
+    assert [e["step"] for e in events[:-1]] == ["understand", "retrieve", "curate", "check"]
+    assert [s["song_id"] for s in events[-1]["songs"]] == [1, 2, 6]
