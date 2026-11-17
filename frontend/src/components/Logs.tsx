@@ -7,7 +7,9 @@ export type LogLine = { t: number; level: "info" | "error"; text: string };
 export function Logs({ lines }: { lines: LogLine[] }) {
   const [open, setOpen] = useState(true);
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => end.current?.scrollIntoView({ block: "nearest" }), [lines.length]);
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "nearest" });
+  }, [lines.length]);
   const start = lines[0]?.t ?? 0;
 
   return (

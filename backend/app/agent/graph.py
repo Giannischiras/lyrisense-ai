@@ -211,8 +211,9 @@ def stream_agent(llm: LLM, search_fn: SearchFn, user_text: str) -> Iterator[dict
     state: AgentState = {"user_text": user_text, "steps": []}
     llm_calls.set([])
     log.info("agent start provider=%s message_chars=%d", llm.name, len(user_text))
-    with tracer().start_as_current_span("agent") as span:
-        span.set_attribute("provider", llm.name)
+    # a generator can be resumed in another context, so don't make this span "current"
+    span = tracer().start_span("agent", attributes={"provider": llm.name})
+    try:
         graph = build_agent(llm, search_fn)
         for update in graph.stream(state, stream_mode="updates"):
             for _node, changes in update.items():
@@ -220,6 +221,8 @@ def stream_agent(llm: LLM, search_fn: SearchFn, user_text: str) -> Iterator[dict
                 if changes and changes.get("steps"):
                     yield {"type": "step", **changes["steps"][-1]}
         span.set_attribute("songs", len(state.get("picks", [])))
+    finally:
+        span.end()
     log.info("agent done songs=%d", len(state.get("picks", [])))
     yield {"type": "result", **_result(state)}
 
