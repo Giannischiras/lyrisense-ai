@@ -12,14 +12,42 @@ It's an AI music agent that runs on your own computer. It searches a big song da
 |---|---|---|
 | Backend | Python, FastAPI, SSE streaming | started |
 | RAG | pgvector + Postgres full text search, RRF to merge them, embeddings and reranker on CPU, whole song vs stanza chunks, shows where each match came from | done (numbers below) |
-| LLM | you pick the provider: Groq / Gemini (free), Claude or OpenAI. your key only stays in RAM | not yet |
-| Agent | LangGraph, plans in steps, guardrails, asks you before doing anything, logs each step | not yet |
+| LLM | you pick the provider: Groq / Gemini (free), Claude or OpenAI. your key only stays in RAM | done |
+| Agent | LangGraph, plans in steps, guardrails, asks you before doing anything, logs each step | first version done |
 | MCP | `wavelength-mcp` server so other MCP clients can use the same tools | not yet |
 | Fine-tuning | QLoRA on a small open model (turn a request into filters), base vs fine-tuned vs Claude | not yet |
 | Self-hosting | vLLM on free Kaggle GPUs, streaming, load test, cost per 1M tokens compared to an API | not yet |
 | Evals | test set, hit@k / MRR for retrieval, LLM-as-judge checked against my own labels, prompt injection tests, all in CI | retrieval done, the LLM parts come with the agent |
 | Ops | Docker Compose, GitHub Actions CI, Phoenix tracing locally | done |
 | Frontend | React, TypeScript, Framer Motion | not yet |
+
+## The agent
+
+The agent is a small [LangGraph](https://github.com/langchain-ai/langgraph) graph in `backend/app/agent/`:
+
+```
+understand -> retrieve -> curate -> check -> done
+                 ^           ^         |
+                 |           +- retry -+   (the LLM picked songs that don't pass the checks)
+                 +- relax filters          (nothing matched, so drop genre/decade and search again)
+```
+
+1. understand: the LLM turns your message into a search query and filters (language, genre, decade, artists to skip, how many songs).
+2. retrieve: the hybrid search from below finds candidates.
+3. curate: the LLM picks songs from the candidates and writes one line on why each one fits.
+4. check: plain code checks the picks. Songs that weren't in the search results (made up by the LLM), duplicates, artists you excluded and more than 2 songs by the same artist get dropped. If too many get dropped, the LLM gets the list of problems and tries once more.
+
+Lyrics come from the internet, so someone could write "ignore your instructions" in a song. Lyrics go into the prompt inside `<song>` tags with any `<` and `>` removed, and the prompt tells the model it's data. There's a test for this.
+
+Each step is logged (what happened, how long it took) and returned with the playlist, and it's traced in Phoenix too. Keys never go into the log.
+
+The agent only proposes the playlist. Creating it in Spotify happens in your browser after you approve it (that part comes with the frontend).
+
+Try it in the terminal (asks for your key with a hidden prompt, nothing saved):
+
+```bash
+cd backend && uv run python try_agent.py groq
+```
 
 ## How good is the search?
 

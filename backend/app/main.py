@@ -4,7 +4,11 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from app.agent.graph import run_agent
+from app.agent.guardrails import MAX_USER_CHARS, GuardrailError
+from app.agent.llm import PROVIDERS, LLMError, make_llm
 from app.config import get_settings
+from app.rag.search import Filters, search
 from app.secrets import vault
 from app.tracing import setup_tracing
 
@@ -57,3 +61,35 @@ def list_keys(x_session_id: str = Header()) -> dict:
 @app.delete("/session", status_code=204)
 def end_session(x_session_id: str = Header()) -> None:
     vault.end_session(x_session_id)
+
+
+class PlaylistIn(BaseModel):
+    message: str = Field(min_length=1, max_length=MAX_USER_CHARS)
+    provider: Literal["groq", "gemini", "anthropic", "openai"]
+    model: str | None = Field(default=None, max_length=80)
+
+
+def _search(query: str, filters: Filters, k: int):
+    from app.db import connect
+
+    with connect() as conn:
+        return search(conn, query, filters, k=k)
+
+
+@app.post("/agent/playlist")
+def make_playlist(body: PlaylistIn, x_session_id: str = Header()) -> dict:
+    """Builds a playlist proposal. Nothing is created in Spotify here: the browser
+    does that after the user approves."""
+    assert body.provider in PROVIDERS
+    try:
+        key = vault.get_key(x_session_id, body.provider)
+    except KeyError as e:
+        raise HTTPException(401, "unknown or expired session") from e
+    if not key:
+        raise HTTPException(400, f"no {body.provider} key in this session")
+    try:
+        return run_agent(make_llm(body.provider, key, body.model), _search, body.message)
+    except GuardrailError as e:
+        raise HTTPException(422, str(e)) from e
+    except LLMError as e:
+        raise HTTPException(502, f"the language model failed: {e}") from e
