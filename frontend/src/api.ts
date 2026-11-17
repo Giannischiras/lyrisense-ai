@@ -1,5 +1,5 @@
-// Talks to the local backend through the Vite proxy (/api -> localhost:8000).
-// The session id and the API key live only in memory. Nothing goes to localStorage.
+// calls the backend through the vite proxy (/api -> localhost:8000)
+// session id and key are only in memory, nothing in localStorage
 
 export type Provider = "groq" | "gemini" | "anthropic" | "openai";
 
@@ -56,7 +56,7 @@ export async function setKey(sid: string, provider: Provider, value: string) {
 }
 
 export function endSession(sid: string) {
-  // keepalive so it still goes out when the tab is closing
+  // keepalive so it still gets sent when you close the tab
   fetch("/api/session", { method: "DELETE", headers: { "X-Session-Id": sid }, keepalive: true });
 }
 

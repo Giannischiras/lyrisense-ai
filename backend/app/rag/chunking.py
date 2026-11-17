@@ -1,7 +1,7 @@
-"""Chunking strategies for lyrics. Compared in evals/chunking (hit@10, MRR).
+"""how we split lyrics into chunks. i compared them in the evals (hit@10, mrr).
 
-- song:   one chunk per song (header + opening lines; the encoder truncates at 128 tokens)
-- stanza: split on blank lines / [Section] headers, tiny stanzas merged
+- song: one chunk per song (title + first lines, the model cuts at 128 tokens anyway)
+- stanza: split on empty lines or [Chorus] style headers, small ones get merged
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ def stanza_chunks(lyrics: str, head: str, min_words: int = 12, max_words: int = 
         else:
             out.append(buf)
     seen: set[str] = set()
-    uniq = [c for c in out if not (c in seen or seen.add(c))]  # choruses repeat
+    uniq = [c for c in out if not (c in seen or seen.add(c))]  # choruses repeat a lot
     return uniq or song_chunks(lyrics, head)
 
 

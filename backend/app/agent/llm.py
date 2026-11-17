@@ -1,8 +1,8 @@
-"""One small interface over the LLM providers the user can pick.
+"""wrapper for the llm providers you can pick in the ui.
 
-Groq, Gemini and OpenAI all speak the OpenAI chat format, so they share one class.
-Claude goes through the official Anthropic SDK. The key comes from the user's
-session (RAM only) and is passed in, never read from env or disk.
+groq, gemini and openai all work with the openai format so they use the same class.
+claude uses the anthropic sdk. the key comes from the user's session (only in memory),
+it's never read from env or a file.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ OPENAI_COMPAT = {
     "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/",
     "openai": None,
 }
-# first one the key has access to wins (model names change, so we check the list)
+# we use the first one the key can access. model names change a lot so we check the list
 PREFERRED = {
     "groq": [
         "openai/gpt-oss-120b",
@@ -63,7 +63,7 @@ def _record(provider: str, model: str, t0: float, prompt_chars: int, reply_chars
 
 
 def parse_json[T: BaseModel](text: str, model: type[T]) -> T:
-    """Models sometimes wrap JSON in ``` fences or add a sentence, so dig it out."""
+    """sometimes the model puts the json in ``` or adds text around it, so find the json part"""
     m = re.search(r"\{.*\}", text, re.S)
     if not m:
         raise LLMError("no JSON object in the model reply")
@@ -74,7 +74,7 @@ def parse_json[T: BaseModel](text: str, model: type[T]) -> T:
 
 
 def complete_json[T: BaseModel](llm: LLM, system: str, user: str, model: type[T]) -> T:
-    """Ask for JSON matching `model`. If it comes back broken, retry once with the error."""
+    """ask for json that fits `model`. if it's broken, try one more time and send the error"""
     schema = json.dumps(model.model_json_schema())
     system = f"{system}\n\nReply with ONE JSON object only, matching this JSON schema:\n{schema}"
     reply = llm.complete(system, user)
@@ -153,7 +153,7 @@ class AnthropicLLM:
 
         t0 = time.perf_counter()
         try:
-            # fallbacks="default": if the model declines, the API retries on a fallback model
+            # fallbacks="default" means if the model refuses, the api tries another model
             r = self._client.beta.messages.create(
                 model=self.model,
                 max_tokens=16000,

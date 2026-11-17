@@ -48,4 +48,4 @@ def test_rrf_prefers_items_ranked_high_in_both_lists():
 def test_filters_sql_parametrised():
     where, args = Filters(language="el", genres=["rap"], decade_from=2000).sql()
     assert "%s" in where and "el" in args and ["rap"] in args
-    assert "'" not in where  # values never interpolated into SQL
+    assert "'" not in where  # values are not put straight into the sql

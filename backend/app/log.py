@@ -1,4 +1,4 @@
-"""Plain logging for the backend. Never log keys, tokens or full prompts."""
+"""simple logging for the backend. dont log keys, tokens or full prompts"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from contextvars import ContextVar
 
 log = logging.getLogger("wavelength")
 
-# LLM calls made during the current agent step (the UI shows them under the step)
+# llm calls in the current step, the ui shows them under each step
 llm_calls: ContextVar[list[dict] | None] = ContextVar("llm_calls", default=None)
 
 

@@ -1,4 +1,4 @@
-"""Local CPU models (ONNX via fastembed). Free, no API key, nothing leaves the machine."""
+"""models that run locally on cpu (onnx with fastembed). free and no api key needed"""
 
 from __future__ import annotations
 

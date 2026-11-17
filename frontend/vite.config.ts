@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-// /api/* goes to the local FastAPI backend, so the browser only talks to one origin
+// send /api to the fastapi backend so we dont need cors
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {

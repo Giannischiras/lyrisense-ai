@@ -3,7 +3,7 @@ import { ChevronDown, Terminal } from "lucide-react";
 
 export type LogLine = { t: number; level: "info" | "error"; text: string };
 
-// Raw event log: everything the backend streamed, with the time since the request started.
+// shows everything the backend sent and the time since the request started
 export function Logs({ lines }: { lines: LogLine[] }) {
   const [open, setOpen] = useState(true);
   const end = useRef<HTMLDivElement>(null);

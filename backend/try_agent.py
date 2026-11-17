@@ -1,9 +1,9 @@
-"""Try the playlist agent from the terminal.
+"""run the agent from the terminal.
 
 cd backend && uv run python try_agent.py groq
 
-It asks for your API key with a hidden prompt. The key stays in memory for this
-run only. Nothing is saved.
+it asks for your api key (hidden input). the key is only kept while it runs,
+nothing gets saved.
 """
 
 from __future__ import annotations

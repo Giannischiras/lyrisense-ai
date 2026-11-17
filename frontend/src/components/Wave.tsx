@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 
-// Animated equalizer bars. `active` makes them dance harder (while the agent works).
+// the equalizer bars. when `active` is true they move more (agent is working)
 export function Wave({ bars = 28, active = false, className = "" }: { bars?: number; active?: boolean; className?: string }) {
   return (
     <div className={`flex items-end justify-center gap-[3px] ${className}`} aria-hidden>

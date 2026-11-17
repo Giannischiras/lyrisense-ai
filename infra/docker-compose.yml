@@ -5,7 +5,7 @@ services:
     image: pgvector/pgvector:pg17
     environment:
       POSTGRES_USER: wavelength
-      POSTGRES_PASSWORD: wavelength   # local dev only; production uses a managed secret
+      POSTGRES_PASSWORD: wavelength   # only for local dev
       POSTGRES_DB: wavelength
     ports:
       - "5432:5432"
@@ -31,7 +31,7 @@ services:
       db:
         condition: service_healthy
 
-  # Local tracing UI: http://localhost:6006 (spans never leave this machine)
+  # phoenix for tracing, open http://localhost:6006
   phoenix:
     image: arizephoenix/phoenix:version-11.0.0
     ports:

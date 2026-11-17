@@ -1,11 +1,10 @@
-"""Download the public Genius lyrics dataset and build Wavelength's song subset.
+"""downloads the public genius lyrics dataset and makes our song list from it.
 
-Lyrics are copyrighted, so they are never committed to the repository. This
-script downloads the raw data to data/raw/ (git-ignored), keeps the most
-popular English and Greek songs, cleans them and writes
-data/processed/songs.parquet.
+lyrics have copyright so they are not in the repo. this downloads the raw data to
+data/raw/ (gitignored), keeps the most popular english and greek songs, cleans them
+and saves data/processed/songs.parquet.
 
-Usage:
+how to run:
     uv run --with duckdb python data/build_dataset.py [--en 50000] [--el 10000]
 """
 
@@ -29,13 +28,13 @@ BASE_URL = (
 )
 N_FILES = 10
 
-# Genius tags; "misc" holds poems, books and transcripts, not songs.
+# genius tags. "misc" has poems, books etc so we skip it
 GENRES = ("pop", "rap", "rock", "rb", "country")
 
 
 def download(n_files: int = N_FILES) -> list[Path]:
     RAW.mkdir(parents=True, exist_ok=True)
-    token = os.environ.get("HF_TOKEN")  # optional; raises the anonymous rate limit
+    token = os.environ.get("HF_TOKEN")  # optional, you get a higher rate limit with it
     paths = []
     for i in range(n_files):
         path = RAW / f"{i:04d}.parquet"
@@ -74,7 +73,7 @@ WITH base AS (
         views::BIGINT                     AS views,
         features,
         language,
-        -- normalise whitespace, drop Genius boilerplate lines
+        -- fix whitespace and remove the extra genius lines
         regexp_replace(
             regexp_replace(lyrics, '(?m)^\\s*\\d*\\s*Contributors?.*$', ''),
             '\\n{3,}', chr(10) || chr(10), 'g'

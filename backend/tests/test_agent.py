@@ -25,7 +25,7 @@ CANDIDATES = [
 
 
 class FakeLLM:
-    """Plays back canned replies and records the prompts it was sent."""
+    """fake llm, returns the replies we give it and saves the prompts"""
 
     name = "fake"
 
@@ -67,7 +67,7 @@ def test_happy_path():
 
 
 def test_bad_picks_are_dropped_and_llm_retries():
-    # 999 is made up, 3 is Coldplay (excluded), 1 is a duplicate, 4/5 = too many by Artist A
+    # 999 doesnt exist, 3 is coldplay (excluded), 1 is twice, 4 and 5 are too many from Artist A
     llm = FakeLLM([understand_reply(), curate_reply([999, 3, 1, 1, 4, 5]), curate_reply([1, 2, 6])])
     out = graph.run_agent(llm, fake_search([CANDIDATES]), "rainy day")
     assert [s["song_id"] for s in out["songs"]] == [1, 2, 6]
@@ -75,7 +75,7 @@ def test_bad_picks_are_dropped_and_llm_retries():
     reasons = {d["song_id"]: d["why"] for d in first_check["dropped"]}
     assert reasons[999] == "not in the search results"
     assert reasons[3] == "artist the user excluded"
-    assert "song 999" in llm.prompts[-1][1]  # feedback reached the retry
+    assert "song 999" in llm.prompts[-1][1]  # the retry got the error message
 
 
 def test_no_results_relaxes_filters_once():

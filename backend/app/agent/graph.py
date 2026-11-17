@@ -1,12 +1,12 @@
-"""The playlist agent, built as a small LangGraph graph.
+"""the playlist agent, made with langgraph.
 
     understand -> retrieve -> curate -> check -+-> done
                     ^            ^             |
                     |            +-- retry ----+   (LLM picked bad songs)
                     +-- relax filters (no results)
 
-Every step adds an entry to `steps` (what happened + how long), which the API
-returns and the UI can show. Steps never contain keys or tokens.
+each step adds what it did and how long it took to `steps`, the ui shows these.
+no keys or tokens go in there.
 """
 
 from __future__ import annotations
@@ -106,7 +106,7 @@ def build_agent(llm: LLM, search_fn: SearchFn):
         return {"candidates": hits, "steps": _step(state, "retrieve", t0, candidates=len(hits))}
 
     def relax(state: AgentState) -> AgentState:
-        # nothing matched all the filters: keep language + excluded artists, drop the rest
+        # got nothing back, so drop the filters except language and excluded artists
         t0 = time.perf_counter()
         f = state["filters"]
         relaxed = Filters(language=f.language, exclude_artists=f.exclude_artists)
@@ -207,11 +207,12 @@ def _result(final: AgentState) -> dict:
 
 
 def stream_agent(llm: LLM, search_fn: SearchFn, user_text: str) -> Iterator[dict]:
-    """Same as run_agent but yields each step as soon as it's done, then the result."""
+    """like run_agent but sends every step when it finishes, then the result"""
     state: AgentState = {"user_text": user_text, "steps": []}
     llm_calls.set([])
     log.info("agent start provider=%s message_chars=%d", llm.name, len(user_text))
-    # a generator can be resumed in another context, so don't make this span "current"
+    # not making this span "current" because the generator can resume somewhere else
+    # (this gave me a "failed to detach context" warning)
     span = tracer().start_span("agent", attributes={"provider": llm.name})
     try:
         graph = build_agent(llm, search_fn)

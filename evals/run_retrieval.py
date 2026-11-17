@@ -1,4 +1,4 @@
-"""Run the golden set against different search setups and save the numbers.
+"""runs the golden set on different search setups and saves the results.
 
 cd backend && uv run python ../evals/run_retrieval.py
 """
@@ -21,7 +21,7 @@ from app.tracing import setup_tracing  # noqa: E402
 
 K = 10
 
-# name -> search() options
+# setup name -> options for search()
 SETUPS = {
     "keyword only": dict(use_vector=False, use_rerank=False),
     "vector only (song)": dict(use_keyword=False, use_rerank=False, strategy="song"),
@@ -36,11 +36,11 @@ SETUPS = {
 
 
 def main() -> None:
-    setup_tracing()  # only if PHOENIX_COLLECTOR_ENDPOINT is set
+    setup_tracing()  # only works if PHOENIX_COLLECTOR_ENDPOINT is set
     golden = [json.loads(line) for line in (ROOT / "datasets" / "golden.jsonl").open()]
     results = {}
     with connect() as conn:
-        search(conn, "warmup", k=1)  # load the models once
+        search(conn, "warmup", k=1)  # first call is slow because it loads the models
         for name, opts in SETUPS.items():
             runs, runs_by_lang, times = [], {"en": [], "el": []}, []
             for g in golden:

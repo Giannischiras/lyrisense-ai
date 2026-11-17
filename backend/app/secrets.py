@@ -1,9 +1,8 @@
-"""In-memory, per-session key vault.
+"""keeps the api keys in memory, one entry per session.
 
-Keys the user pastes into the UI live here and nowhere else: not on disk, not
-in the database, not in logs. A session is identified by a random id that the
-browser keeps in memory only. Sessions expire after inactivity and everything
-disappears when the process stops.
+the keys from the ui are only stored here. not on disk, not in the db, not in logs.
+each session has a random id that the browser keeps in memory. sessions expire if
+nobody uses them and everything is gone when the server stops.
 """
 
 from __future__ import annotations
@@ -69,7 +68,7 @@ class KeyVault:
         for sid in [k for k, v in self._sessions.items() if now - v.last_seen > self._ttl]:
             del self._sessions[sid]
 
-    def __repr__(self) -> str:  # never print key material
+    def __repr__(self) -> str:  # so the key never gets printed by accident
         return f"KeyVault(sessions={len(self._sessions)})"
 
 

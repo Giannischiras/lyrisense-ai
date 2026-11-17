@@ -1,4 +1,4 @@
-"""Retrieval metrics for the evals (hit@k and MRR)."""
+"""metrics for the search evals (hit@k and mrr)"""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ def reciprocal_rank(ranked: list[int], relevant: set[int], k: int = 10) -> float
 
 
 def summarize(runs: list[tuple[list[int], set[int]]], k: int = 10) -> dict[str, float]:
-    """runs = [(ranked song ids, relevant ids), ...] -> averaged metrics."""
+    """runs is a list of (ranked ids, correct ids), returns the averages"""
     if not runs:
         return {"hit@1": 0.0, "hit@5": 0.0, f"hit@{k}": 0.0, "mrr": 0.0}
     return {

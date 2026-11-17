@@ -1,4 +1,4 @@
--- Wavelength schema. Holds songs and embeddings only: no users, no keys, no tokens.
+-- only songs and embeddings here. no users, keys or tokens
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS songs (
     features  TEXT,
     language  TEXT NOT NULL,
     lyrics    TEXT NOT NULL,
-    -- keyword side of hybrid search; 'simple' config works for English and Greek
+    -- for the keyword search. 'simple' works for both english and greek
     tsv       TSVECTOR GENERATED ALWAYS AS (
                   setweight(to_tsvector('simple', coalesce(title, '')), 'A') ||
                   setweight(to_tsvector('simple', coalesce(artist, '')), 'A') ||
@@ -27,8 +27,8 @@ CREATE INDEX IF NOT EXISTS songs_filters_idx  ON songs (language, genre, decade)
 CREATE INDEX IF NOT EXISTS songs_artist_trgm  ON songs USING GIN (artist gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS songs_title_trgm   ON songs USING GIN (title gin_trgm_ops);
 
--- Vector side of hybrid search. One row per chunk; `strategy` lets us compare
--- chunking schemes (song / stanza) on the same songs.
+-- for the vector search. one row per chunk, `strategy` is song or stanza
+-- so i can compare the two on the same songs
 CREATE TABLE IF NOT EXISTS chunks (
     id        BIGSERIAL PRIMARY KEY,
     song_id   BIGINT NOT NULL REFERENCES songs(id) ON DELETE CASCADE,

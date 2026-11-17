@@ -1,8 +1,8 @@
-"""Local tracing with OpenTelemetry, viewed in Phoenix (http://localhost:6006).
+"""tracing with opentelemetry, you can see it in phoenix (http://localhost:6006).
 
-Off by default. Set PHOENIX_COLLECTOR_ENDPOINT (e.g. http://localhost:6006/v1/traces)
-to turn it on. Spans only go to that local Phoenix container, nothing leaves the
-machine. Never put API keys or tokens in span attributes.
+off by default, set PHOENIX_COLLECTOR_ENDPOINT (like http://localhost:6006/v1/traces)
+to turn it on. it only sends to the local phoenix container.
+dont put keys or tokens in the span attributes.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ _configured = False
 
 
 def setup_tracing(exporter: SpanExporter | None = None) -> bool:
-    """Turn tracing on if an endpoint is set (or an exporter is passed, for tests)."""
+    """turns tracing on if the endpoint is set (or if a test passes an exporter)"""
     global _configured
     endpoint = os.environ.get("PHOENIX_COLLECTOR_ENDPOINT")
     if _configured or (exporter is None and not endpoint):

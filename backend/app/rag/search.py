@@ -1,7 +1,7 @@
-"""Hybrid retrieval: Postgres full-text + pgvector, fused with RRF, then reranked.
+"""hybrid search: postgres full text + pgvector, merged with rrf, then reranked.
 
-Every result carries a citation: the chunk that matched best and why the song
-was chosen (keyword hit, semantic match, rerank score).
+each result also has the chunk that matched best and why it was picked
+(keyword match, vector match, rerank score).
 """
 
 from __future__ import annotations
@@ -72,7 +72,7 @@ class Hit:
 
 
 def rrf_fuse(*rankings: list[int], k: int = RRF_K) -> dict[int, float]:
-    """Reciprocal Rank Fusion over lists of ids (best first)."""
+    """rrf (reciprocal rank fusion), lists have the best ids first"""
     scores: dict[int, float] = {}
     for ranking in rankings:
         for rank, sid in enumerate(ranking, start=1):
@@ -126,7 +126,7 @@ def _vector_inner(conn, qv, where, args, n, strategy) -> tuple[list[int], dict[i
     ).fetchall()
     order: list[int] = []
     best: dict[int, str] = {}
-    for sid, text, _ in rows:  # collapse chunks -> songs, keep best chunk as citation
+    for sid, text, _ in rows:  # many chunks can be the same song, keep only the best one
         if sid not in best:
             best[sid] = text
             order.append(sid)
@@ -146,7 +146,7 @@ def search(
     use_rerank: bool = True,
 ) -> list[Hit]:
     with tracer().start_as_current_span("search") as span:
-        span.set_attribute("query", query)  # the mood text only, never keys or tokens
+        span.set_attribute("query", query)  # just the search text, no keys
         span.set_attribute("k", k)
         span.set_attribute("filters", str(asdict(filters or Filters())))
         hits = _search(

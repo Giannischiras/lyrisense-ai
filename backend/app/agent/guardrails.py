@@ -1,10 +1,10 @@
-"""Checks around the LLM: what goes in and what comes out.
+"""checks for what goes into the llm and what comes out.
 
-- user text is limited in size and cleaned
-- lyrics/snippets are untrusted (anyone can write "ignore your instructions" in a song),
-  so they're cleaned and put inside <song> tags that the prompt says are data only
-- the playlist the LLM returns is checked against the real search results: no made up
-  songs, no duplicates, no excluded artists, not too many songs by one artist
+- user text gets cut to a max length and cleaned
+- lyrics can have anything in them (even "ignore your instructions"), so i clean them
+  and put them in <song> tags, and the prompt says to treat those as data
+- the playlist from the llm is checked against the real search results: no fake songs,
+  no duplicates, no excluded artists, max 2 songs per artist
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ def clean_user_text(text: str) -> str:
 
 
 def untrusted(text: str, limit: int = 300) -> str:
-    """Make lyric text safe to paste into a prompt: no tags, no newlines, short."""
+    """cleans lyrics before they go in the prompt (no tags, no newlines, short)"""
     text = _CONTROL.sub(" ", text)
     text = text.replace("<", "(").replace(">", ")")
     return re.sub(r"\s+", " ", text).strip()[:limit]

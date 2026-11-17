@@ -1,4 +1,4 @@
-"""Chunk + embed songs into the `chunks` table.
+"""splits songs into chunks, embeds them and saves to the `chunks` table.
 
 uv run python -m app.rag.index --strategy stanza [--limit 5000]
 """
@@ -23,9 +23,9 @@ def build_index(strategy: str, limit: int | None = None, batch: int = 512) -> in
         init_schema(conn)
         register_vector(conn)
         conn.execute("DELETE FROM chunks WHERE strategy = %s", (strategy,))
-        # Bulk-load without the HNSW index, then build it once: inserting into a
-        # live HNSW index row by row is ~100x slower.
-        conn.execute(f"DROP INDEX IF EXISTS chunks_hnsw_{strategy}")  # strategy is allowlisted
+        # drop the hnsw index first and build it again at the end,
+        # inserting with the index there was like 100x slower
+        conn.execute(f"DROP INDEX IF EXISTS chunks_hnsw_{strategy}")  # strategy is checked before
         q = "SELECT id, title, artist, genre, year, lyrics FROM songs ORDER BY views DESC"
         rows = conn.execute(
             q + (" LIMIT %s" if limit else ""), (limit,) if limit else ()
@@ -61,7 +61,7 @@ def build_index(strategy: str, limit: int | None = None, batch: int = 512) -> in
         conn.commit()
         print(f"\nbuilding HNSW index for {strategy} ...")
         conn.execute("SET maintenance_work_mem = '512MB'")
-        init_schema(conn)  # recreates the dropped index
+        init_schema(conn)  # builds the index again
     print(f"done: {total} chunks in {time.time() - t0:.0f}s")
     return total
 

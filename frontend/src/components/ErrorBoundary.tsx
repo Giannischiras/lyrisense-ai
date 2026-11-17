@@ -1,6 +1,6 @@
 import { Component, type ReactNode } from "react";
 
-// If something in the UI crashes, show what happened instead of a blank screen.
+// if the ui crashes show the error, not a black screen
 export class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
 

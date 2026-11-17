@@ -55,7 +55,7 @@ def set_key(body: KeyIn, x_session_id: str = Header()) -> None:
 
 @app.get("/session/keys")
 def list_keys(x_session_id: str = Header()) -> dict:
-    """Returns only WHICH providers are configured, never the values."""
+    """only says which providers have a key, not the keys"""
     try:
         return {"configured": vault.configured(x_session_id)}
     except KeyError as e:
@@ -93,7 +93,7 @@ def _llm_for(body: PlaylistIn, sid: str):
 
 @app.post("/agent/playlist/stream")
 def stream_playlist(body: PlaylistIn, x_session_id: str = Header()) -> StreamingResponse:
-    """Server-sent events: one `step` event per agent step, then a `result` event."""
+    """sse stream: a `step` event for each step and a `result` at the end"""
     llm = _llm_for(body, x_session_id)
 
     def events():
@@ -116,8 +116,8 @@ def stream_playlist(body: PlaylistIn, x_session_id: str = Header()) -> Streaming
 
 @app.post("/agent/playlist")
 def make_playlist(body: PlaylistIn, x_session_id: str = Header()) -> dict:
-    """Builds a playlist proposal. Nothing is created in Spotify here: the browser
-    does that after the user approves."""
+    """makes the playlist. doesn't touch spotify, the browser will do that later
+    if the user says ok"""
     llm = _llm_for(body, x_session_id)
     try:
         return run_agent(llm, _search, body.message)

@@ -1,4 +1,4 @@
-"""Load data/processed/songs.parquet into Postgres.
+"""loads data/processed/songs.parquet into postgres.
 
 uv run python -m app.ingest [path/to/songs.parquet]
 """

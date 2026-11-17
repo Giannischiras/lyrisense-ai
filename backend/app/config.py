@@ -1,8 +1,7 @@
-"""Non-secret settings, read from the environment or a local .env file.
+"""settings that are not secret, from env vars or a local .env file.
 
-Wavelength never reads API keys from the environment or from files. Keys are
-supplied by the user through the UI at runtime and kept only in process memory
-(see app.secrets).
+api keys are NOT read from here. the user pastes them in the ui and they only
+stay in memory (see app/secrets.py).
 """
 
 from functools import lru_cache

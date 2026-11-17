@@ -1,4 +1,4 @@
-"""What the LLM has to return at each step. Pydantic checks it, so bad JSON gets caught."""
+"""what the llm should return in each step. pydantic checks it so bad json fails early"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ Genre = Literal["pop", "rock", "rap", "rb", "country"]
 
 
 class PlaylistRequest(BaseModel):
-    """Step 1: turn the user's message into search terms and filters."""
+    """step 1: user message -> search query + filters"""
 
     search_query: str = Field(description="mood/theme in a few words, used for the song search")
     language: Literal["en", "el"] | None = None
@@ -27,7 +27,7 @@ class Pick(BaseModel):
 
 
 class CuratedPlaylist(BaseModel):
-    """Step 2: pick songs from the candidates and say why."""
+    """step 2: pick songs from the results and say why"""
 
     title: str = Field(max_length=80)
     picks: list[Pick] = Field(max_length=40)
