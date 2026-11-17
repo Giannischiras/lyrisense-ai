@@ -6,9 +6,11 @@ from pydantic import BaseModel, Field
 
 from app.config import get_settings
 from app.secrets import vault
+from app.tracing import setup_tracing
 
 settings = get_settings()
 
+setup_tracing()
 app = FastAPI(title="Wavelength API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,

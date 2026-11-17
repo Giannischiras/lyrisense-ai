@@ -24,11 +24,18 @@ services:
     env_file: ../.env
     environment:
       DATABASE_URL: postgresql+psycopg://wavelength:wavelength@db:5432/wavelength
+      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006/v1/traces
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+
+  # Local tracing UI: http://localhost:6006 (spans never leave this machine)
+  phoenix:
+    image: arizephoenix/phoenix:version-11.0.0
+    ports:
+      - "6006:6006"
 
 volumes:
   pgdata:

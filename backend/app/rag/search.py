@@ -12,6 +12,7 @@ from pgvector.psycopg import register_vector
 from psycopg import Connection
 
 from app.rag.models import embed, rerank
+from app.tracing import tracer
 
 RRF_K = 60
 
@@ -80,6 +81,13 @@ def rrf_fuse(*rankings: list[int], k: int = RRF_K) -> dict[int, float]:
 
 
 def _keyword(conn: Connection, query: str, f: Filters, n: int) -> list[int]:
+    with tracer().start_as_current_span("keyword_search") as span:
+        ids = _keyword_inner(conn, query, f, n)
+        span.set_attribute("results", len(ids))
+        return ids
+
+
+def _keyword_inner(conn: Connection, query: str, f: Filters, n: int) -> list[int]:
     where, args = f.sql()
     rows = conn.execute(
         f"""
@@ -96,7 +104,16 @@ def _vector(
     conn: Connection, query: str, f: Filters, n: int, strategy: str
 ) -> tuple[list[int], dict[int, str]]:
     where, args = f.sql()
-    qv = embed([query])[0]
+    with tracer().start_as_current_span("embed_query"):
+        qv = embed([query])[0]
+    with tracer().start_as_current_span("vector_search") as span:
+        span.set_attribute("strategy", strategy)
+        order, best = _vector_inner(conn, qv, where, args, n, strategy)
+        span.set_attribute("results", len(order))
+    return order, best
+
+
+def _vector_inner(conn, qv, where, args, n, strategy) -> tuple[list[int], dict[int, str]]:
     conn.execute("SET LOCAL hnsw.ef_search = 200")
     rows = conn.execute(
         f"""
@@ -127,6 +144,31 @@ def search(
     use_keyword: bool = True,
     use_vector: bool = True,
     use_rerank: bool = True,
+) -> list[Hit]:
+    with tracer().start_as_current_span("search") as span:
+        span.set_attribute("query", query)  # the mood text only, never keys or tokens
+        span.set_attribute("k", k)
+        span.set_attribute("filters", str(asdict(filters or Filters())))
+        hits = _search(
+            conn,
+            query,
+            filters,
+            k,
+            strategy,
+            candidates,
+            rerank_pool,
+            use_keyword,
+            use_vector,
+            use_rerank,
+        )
+        span.set_attribute("results", len(hits))
+        if hits:
+            span.set_attribute("top_result", f"{hits[0].title} - {hits[0].artist}")
+        return hits
+
+
+def _search(
+    conn, query, filters, k, strategy, candidates, rerank_pool, use_keyword, use_vector, use_rerank
 ) -> list[Hit]:
     f = filters or Filters()
     register_vector(conn)
@@ -176,7 +218,10 @@ def search(
     if use_rerank:
         pool = hits[:rerank_pool]
         docs = [f"{h.title} by {h.artist} ({h.genre}, {h.year}): {h.snippet}" for h in pool]
-        for h, s in zip(pool, rerank(query, docs), strict=True):
+        with tracer().start_as_current_span("rerank") as span:
+            span.set_attribute("candidates", len(docs))
+            scores = rerank(query, docs)
+        for h, s in zip(pool, scores, strict=True):
             h.rerank_score = s
         hits = sorted(pool, key=lambda h: h.rerank_score or 0, reverse=True) + hits[rerank_pool:]
     return hits[:k]

@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT.parent / "backend"))
 from app.db import connect  # noqa: E402
 from app.rag.metrics import summarize  # noqa: E402
 from app.rag.search import search  # noqa: E402
+from app.tracing import setup_tracing  # noqa: E402
 
 K = 10
 
@@ -35,6 +36,7 @@ SETUPS = {
 
 
 def main() -> None:
+    setup_tracing()  # only if PHOENIX_COLLECTOR_ENDPOINT is set
     golden = [json.loads(line) for line in (ROOT / "datasets" / "golden.jsonl").open()]
     results = {}
     with connect() as conn:

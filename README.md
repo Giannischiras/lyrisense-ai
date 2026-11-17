@@ -17,8 +17,8 @@ It's an AI music agent that runs on your own computer. It searches a big song da
 | MCP | `wavelength-mcp` server so other MCP clients can use the same tools | not yet |
 | Fine-tuning | QLoRA on a small open model (turn a request into filters), base vs fine-tuned vs Claude | not yet |
 | Self-hosting | vLLM on free Kaggle GPUs, streaming, load test, cost per 1M tokens compared to an API | not yet |
-| Evals | test set, hit@k / MRR for retrieval, LLM-as-judge checked against my own labels, prompt injection tests, all in CI | retrieval done |
-| Ops | Docker Compose, GitHub Actions CI, Phoenix tracing locally | CI done |
+| Evals | test set, hit@k / MRR for retrieval, LLM-as-judge checked against my own labels, prompt injection tests, all in CI | retrieval done, the LLM parts come with the agent |
+| Ops | Docker Compose, GitHub Actions CI, Phoenix tracing locally | done |
 | Frontend | React, TypeScript, Framer Motion | not yet |
 
 ## How good is the search?
@@ -79,6 +79,12 @@ Only the backend:
 cd backend && uv sync && uv run uvicorn app.main:app --reload
 uv run pytest
 ```
+
+## Tracing
+
+Every search sends a trace to [Phoenix](https://github.com/Arize-ai/phoenix), which runs in its own container. You can open it at http://localhost:6006 and see each step of a search (embedding, keyword search, vector search per chunk type, reranking) with how long it took and how many results it gave back. That's how I found out the reranker was taking almost all the time.
+
+It's off unless `PHOENIX_COLLECTOR_ENDPOINT` is set (docker compose sets it for you). Traces stay on your machine, and there's a test that checks API keys never end up in a span.
 
 ## Data
 
