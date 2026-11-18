@@ -30,7 +30,13 @@ PREFERRED = {
         "openai/gpt-oss-20b",
         "llama-3.1-8b-instant",
     ],
-    "gemini": ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"],
+    "gemini": [
+        "gemini-3-flash",
+        "gemini-3-flash-preview",
+        "gemini-flash-latest",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+    ],
     "openai": ["gpt-4.1-mini", "gpt-4o-mini", "gpt-4.1", "gpt-4o"],
 }
 ANTHROPIC_MODEL = "claude-opus-5-5"
@@ -38,7 +44,9 @@ PROVIDERS = (*OPENAI_COMPAT, "anthropic")
 
 
 class LLMError(RuntimeError):
-    pass
+    def __init__(self, msg: str, status: int | None = None) -> None:
+        super().__init__(msg)
+        self.status = status
 
 
 class LLM(Protocol):
@@ -97,7 +105,8 @@ class OpenAICompatLLM:
             api_key=api_key, base_url=OPENAI_COMPAT[provider], timeout=60, max_retries=1
         )
 
-    def _pick_model(self) -> str:
+    def _candidates(self) -> list[str]:
+        """models to try, best first. the preferred ones, then any other flash/mini model"""
         import openai
 
         try:
@@ -106,21 +115,29 @@ class OpenAICompatLLM:
             raise LLMError(f"{self.name} rejected the API key") from e
         except openai.APIError as e:
             raise LLMError(f"could not list {self.name} models: {e}") from e
-        for m in PREFERRED[self.name]:
-            if m in available:
-                return m
-        raise LLMError(f"none of the usual {self.name} models are enabled for this key")
+        picks = [m for m in PREFERRED[self.name] if m in available]
+        # model names change a lot, so also take newer ones we don't know about yet
+        extra = sorted(
+            (
+                m
+                for m in available
+                if m not in picks
+                and any(w in m for w in ("flash", "mini", "instant"))
+                and not any(w in m for w in ("lite", "image", "tts", "audio", "live", "embed"))
+            ),
+            reverse=True,
+        )
+        if not picks + extra:
+            raise LLMError(f"none of the usual {self.name} models are enabled for this key")
+        return picks + extra
 
-    def complete(self, system: str, user: str) -> str:
+    def _call(self, model: str, system: str, user: str):
         import openai
 
-        if self.model is None:
-            self.model = self._pick_model()
-            log.info("using model %s for %s", self.model, self.name)
-        t0 = time.perf_counter()
+        self._t0 = time.perf_counter()
         try:
-            r = self._client.chat.completions.create(
-                model=self.model,
+            return self._client.chat.completions.create(
+                model=model,
                 temperature=0.3,
                 response_format={"type": "json_object"},
                 messages=[
@@ -129,12 +146,34 @@ class OpenAICompatLLM:
                 ],
             )
         except openai.APIStatusError as e:
-            log.warning(
-                "llm error provider=%s model=%s status=%s", self.name, self.model, e.status_code
-            )
-            raise LLMError(f"{self.name} returned {e.status_code}: {e.message}") from e
+            log.warning("llm error provider=%s model=%s status=%s", self.name, model, e.status_code)
+            raise LLMError(
+                f"{self.name} returned {e.status_code} for {model}: {e.message}", e.status_code
+            ) from e
         except openai.APIError as e:
             raise LLMError(f"{self.name} request failed: {e}") from e
+
+    def complete(self, system: str, user: str) -> str:
+        if self.model is not None:
+            r = self._call(self.model, system, user)
+        else:
+            # try models until one answers. a model can be in the list but closed for
+            # new keys (404), or have no free quota left (429)
+            r = None
+            last: LLMError | None = None
+            for m in self._candidates()[:5]:
+                try:
+                    r = self._call(m, system, user)
+                    self.model = m
+                    log.info("using model %s for %s", m, self.name)
+                    break
+                except LLMError as e:
+                    if e.status not in (404, 429):
+                        raise
+                    last = e
+            if r is None:
+                raise last or LLMError(f"no {self.name} model answered")
+        t0 = self._t0
         text = r.choices[0].message.content or ""
         _record(self.name, self.model, t0, len(system) + len(user), len(text))
         return text
