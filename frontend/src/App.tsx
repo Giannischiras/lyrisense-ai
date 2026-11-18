@@ -160,7 +160,7 @@ export default function App() {
       <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
         <div className="flex items-center gap-3">
           <Wave bars={8} active={running} className="h-6 w-10" />
-          <span className="font-display text-xl font-bold gradient-text">Wavelength</span>
+          <span className="font-display text-xl font-bold gradient-text">Lyrisense</span>
         </div>
         <button onClick={logout} className="flex items-center gap-2 rounded-full border border-line px-3 py-1.5 text-xs text-muted hover:text-white">
           <LogOut className="h-3.5 w-3.5" /> forget key

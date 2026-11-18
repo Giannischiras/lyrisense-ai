@@ -6,7 +6,7 @@ import logging
 import os
 from contextvars import ContextVar
 
-log = logging.getLogger("wavelength")
+log = logging.getLogger("lyrisense")
 
 # llm calls in the current step, the ui shows them under each step
 llm_calls: ContextVar[list[dict] | None] = ContextVar("llm_calls", default=None)
@@ -18,5 +18,5 @@ def setup_logging() -> None:
     h = logging.StreamHandler()
     h.setFormatter(logging.Formatter("%(asctime)s %(levelname)-5s %(message)s", "%H:%M:%S"))
     log.addHandler(h)
-    log.setLevel(os.environ.get("WAVELENGTH_LOG_LEVEL", "INFO"))
+    log.setLevel(os.environ.get("LYRISENSE_LOG_LEVEL", "INFO"))
     log.propagate = False

@@ -184,7 +184,7 @@ class AnthropicLLM:
         import anthropic
 
         self.name = "anthropic"
-        self.model = model or os.environ.get("WAVELENGTH_ANTHROPIC_MODEL", ANTHROPIC_MODEL)
+        self.model = model or os.environ.get("LYRISENSE_ANTHROPIC_MODEL", ANTHROPIC_MODEL)
         self._client = anthropic.Anthropic(api_key=api_key, timeout=120, max_retries=2)
 
     def complete(self, system: str, user: str) -> str:

@@ -20,7 +20,7 @@ class PlaylistRequest(BaseModel):
     reply: str = Field(
         default="",
         max_length=1200,
-        description="only for chat: your answer as Wavelength, in the user's language",
+        description="only for chat: your answer as Lyrisense, in the user's language",
     )
     search_query: str = Field(
         default="", description="mood/theme in a few words, used for the song search"

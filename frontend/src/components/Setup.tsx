@@ -42,10 +42,10 @@ export function Setup({ onConnect }: { onConnect: (p: Provider, key: string) => 
       >
         <Wave bars={36} className="mx-auto mb-8 h-16 w-72" />
         <h1 className="text-center font-display text-5xl font-bold tracking-tight sm:text-6xl">
-          <span className="gradient-text">Wavelength</span>
+          <span className="gradient-text">Lyrisense</span>
         </h1>
         <p className="mt-3 text-center text-lg text-muted">
-          Tell it how you feel. Get a playlist that gets it.
+          Tell it how you feel. It finds the songs whose lyrics say it.
         </p>
 
         <form onSubmit={submit} className="glass mt-10 rounded-3xl p-6 sm:p-8">
@@ -105,7 +105,7 @@ export function Setup({ onConnect }: { onConnect: (p: Provider, key: string) => 
 
           <p className="mt-5 flex items-start gap-2 text-xs leading-relaxed text-muted">
             <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            Your key goes only to the Wavelength backend running on this computer and stays in its memory
+            Your key goes only to the Lyrisense backend running on this computer and stays in its memory
             for this session. It's never saved to disk, a database, logs or your browser.
           </p>
         </form>

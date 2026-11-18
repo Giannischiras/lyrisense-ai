@@ -9,7 +9,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
   }
 
   componentDidCatch(error: Error) {
-    console.error("[wavelength] UI crashed:", error);
+    console.error("[lyrisense] UI crashed:", error);
   }
 
   render() {

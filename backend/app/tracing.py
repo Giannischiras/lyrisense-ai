@@ -27,7 +27,7 @@ def setup_tracing(exporter: SpanExporter | None = None) -> bool:
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
         exporter = OTLPSpanExporter(endpoint=endpoint)
-    provider = TracerProvider(resource=Resource.create({"service.name": "wavelength"}))
+    provider = TracerProvider(resource=Resource.create({"service.name": "lyrisense"}))
     provider.add_span_processor(BatchSpanProcessor(exporter))
     trace.set_tracer_provider(provider)
     _configured = True
@@ -35,4 +35,4 @@ def setup_tracing(exporter: SpanExporter | None = None) -> bool:
 
 
 def tracer() -> trace.Tracer:
-    return trace.get_tracer("wavelength")
+    return trace.get_tracer("lyrisense")

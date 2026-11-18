@@ -123,7 +123,7 @@ def build(n_en: int, n_el: int) -> None:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--en", type=int, default=int(os.environ.get("WAVELENGTH_SONGS_EN", 50000)))
-    ap.add_argument("--el", type=int, default=int(os.environ.get("WAVELENGTH_SONGS_EL", 10000)))
+    ap.add_argument("--en", type=int, default=int(os.environ.get("LYRISENSE_SONGS_EN", 50000)))
+    ap.add_argument("--el", type=int, default=int(os.environ.get("LYRISENSE_SONGS_EL", 10000)))
     a = ap.parse_args()
     build(a.en, a.el)

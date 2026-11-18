@@ -20,7 +20,7 @@ settings = get_settings()
 
 setup_logging()
 setup_tracing()
-app = FastAPI(title="Wavelength API", version="0.1.0")
+app = FastAPI(title="Lyrisense API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,

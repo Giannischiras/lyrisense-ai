@@ -8,12 +8,10 @@ from functools import lru_cache
 import numpy as np
 
 EMBED_MODEL = os.environ.get(
-    "WAVELENGTH_EMBED_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    "LYRISENSE_EMBED_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 )
 EMBED_DIM = 384
-RERANK_MODEL = os.environ.get(
-    "WAVELENGTH_RERANK_MODEL", "jinaai/jina-reranker-v2-base-multilingual"
-)
+RERANK_MODEL = os.environ.get("LYRISENSE_RERANK_MODEL", "jinaai/jina-reranker-v2-base-multilingual")
 
 
 @lru_cache

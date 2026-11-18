@@ -144,11 +144,11 @@ def test_stream_yields_steps_then_result():
 
 
 def test_small_talk_gets_a_reply_and_no_search():
-    reply = json.dumps({"intent": "chat", "reply": "Γεια! Είμαι το Wavelength."})
+    reply = json.dumps({"intent": "chat", "reply": "Γεια! Είμαι το Lyrisense."})
     search = fake_search([CANDIDATES])
     out = graph.run_agent(FakeLLM([reply]), search, "ποιος είσαι;")
     assert out["kind"] == "chat"
-    assert out["reply"] == "Γεια! Είμαι το Wavelength."
+    assert out["reply"] == "Γεια! Είμαι το Lyrisense."
     assert out["songs"] == []
     assert search.calls == []
     assert [s["step"] for s in out["steps"]] == ["understand"]

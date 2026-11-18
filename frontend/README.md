@@ -1,4 +1,4 @@
-# Wavelength frontend
+# Lyrisense frontend
 
 React + TypeScript + Vite, Tailwind for styling and Framer Motion for the animations.
 
