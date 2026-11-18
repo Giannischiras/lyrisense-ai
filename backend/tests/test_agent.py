@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from app.agent import graph
 from app.agent.guardrails import GuardrailError, check_picks, clean_user_text, untrusted
 from app.agent.llm import LLMError, parse_json
-from app.agent.schemas import Pick, PlaylistRequest
+from app.agent.schemas import Pick, PlaylistRequest, Turn
 from app.rag.search import Hit
 
 
@@ -141,3 +141,23 @@ def test_stream_yields_steps_then_result():
     assert [e["type"] for e in events] == ["step", "step", "step", "step", "result"]
     assert [e["step"] for e in events[:-1]] == ["understand", "retrieve", "curate", "check"]
     assert [s["song_id"] for s in events[-1]["songs"]] == [1, 2, 6]
+
+
+def test_small_talk_gets_a_reply_and_no_search():
+    reply = json.dumps({"intent": "chat", "reply": "Γεια! Είμαι το Wavelength."})
+    search = fake_search([CANDIDATES])
+    out = graph.run_agent(FakeLLM([reply]), search, "ποιος είσαι;")
+    assert out["kind"] == "chat"
+    assert out["reply"] == "Γεια! Είμαι το Wavelength."
+    assert out["songs"] == []
+    assert search.calls == []
+    assert [s["step"] for s in out["steps"]] == ["understand"]
+
+
+def test_history_goes_to_the_llm():
+    llm = FakeLLM([understand_reply(), curate_reply([1, 2, 6])])
+    history = [Turn(role="user", content="sad songs"), Turn(role="assistant", content="made it")]
+    out = graph.run_agent(llm, fake_search([CANDIDATES]), "more like these", history)
+    assert out["kind"] == "playlist"
+    assert "<history>" in llm.prompts[0][1] and "sad songs" in llm.prompts[0][1]
+    assert "Giannis Chiras" in llm.prompts[0][0]

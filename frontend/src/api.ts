@@ -19,7 +19,11 @@ export type Song = {
   matched_lyrics: string;
 };
 
+export type Turn = { role: "user" | "assistant"; content: string };
+
 export type PlaylistResult = {
+  kind: "chat" | "playlist";
+  reply: string | null;
   title: string | null;
   songs: Song[];
   request: Record<string, unknown> | null;
@@ -64,13 +68,14 @@ export async function streamPlaylist(
   sid: string,
   provider: Provider,
   message: string,
+  history: Turn[],
   onStep: (s: Step) => void,
 ): Promise<PlaylistResult> {
   const r = await check(
     await fetch("/api/agent/playlist/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Session-Id": sid },
-      body: JSON.stringify({ message, provider }),
+      body: JSON.stringify({ message, provider, history }),
     }),
   );
   const reader = r.body!.getReader();

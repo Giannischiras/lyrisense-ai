@@ -13,6 +13,7 @@ const META: Record<Step["step"], { label: string; icon: typeof Brain }> = {
 function detail(s: Step): string {
   switch (s.step) {
     case "understand": {
+      if (s.intent === "chat") return "just talking, answering directly";
       const r = s.request as { search_query?: string; size?: number; exclude_artists?: string[] } | undefined;
       const skip = r?.exclude_artists?.length ? `, skip ${r.exclude_artists.join(", ")}` : "";
       return r ? `"${r.search_query}", ${r.size} songs${skip}` : "";

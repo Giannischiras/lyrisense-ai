@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from app.agent.graph import run_agent, stream_agent
 from app.agent.guardrails import MAX_USER_CHARS, GuardrailError
 from app.agent.llm import PROVIDERS, LLMError, make_llm
+from app.agent.schemas import Turn
 from app.config import get_settings
 from app.log import log, setup_logging
 from app.rag.search import Filters, search
@@ -71,6 +72,8 @@ class PlaylistIn(BaseModel):
     message: str = Field(min_length=1, max_length=MAX_USER_CHARS)
     provider: Literal["groq", "gemini", "anthropic", "openai"]
     model: str | None = Field(default=None, max_length=80)
+    # earlier messages, kept by the browser only. we use them for context and forget them
+    history: list[Turn] = Field(default_factory=list, max_length=20)
 
 
 def _search(query: str, filters: Filters, k: int):
@@ -98,7 +101,7 @@ def stream_playlist(body: PlaylistIn, x_session_id: str = Header()) -> Streaming
 
     def events():
         try:
-            for ev in stream_agent(llm, _search, body.message):
+            for ev in stream_agent(llm, _search, body.message, body.history):
                 yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
         except GuardrailError as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
@@ -120,7 +123,7 @@ def make_playlist(body: PlaylistIn, x_session_id: str = Header()) -> dict:
     if the user says ok"""
     llm = _llm_for(body, x_session_id)
     try:
-        return run_agent(llm, _search, body.message)
+        return run_agent(llm, _search, body.message, body.history)
     except GuardrailError as e:
         raise HTTPException(422, str(e)) from e
     except LLMError as e:

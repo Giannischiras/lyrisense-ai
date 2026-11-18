@@ -32,7 +32,7 @@ understand -> retrieve -> curate -> check -> done
                  +- relax filters          (nothing matched, so drop genre/decade and search again)
 ```
 
-1. understand: the LLM turns your message into a search query and filters (language, genre, decade, artists to skip, how many songs).
+1. understand: the LLM turns your message into a search query and filters (language, genre, decade, artists to skip, how many songs). If you're just talking to it ("who are you?", "thanks") it answers as Wavelength and stops here. The chat history stays in the browser and gets sent with each message, so follow ups like "more like these" work.
 2. retrieve: the hybrid search from below finds candidates.
 3. curate: the LLM picks songs from the candidates and writes one line on why each one fits.
 4. check: plain code checks the picks. Songs that weren't in the search results (made up by the LLM), duplicates, artists you excluded and more than 2 songs by the same artist get dropped. If too many get dropped, the LLM gets the list of problems and tries once more.
