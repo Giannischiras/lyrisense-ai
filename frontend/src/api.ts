@@ -4,7 +4,7 @@
 export type Provider = "groq" | "gemini" | "anthropic" | "openai";
 
 export type Step = {
-  step: "understand" | "retrieve" | "relax_filters" | "curate" | "check";
+  step: "understand" | "retrieve" | "relax_filters" | "curate" | "check" | "search_raw";
   ms: number;
   [key: string]: unknown;
 };
@@ -18,6 +18,8 @@ export type Song = {
   reason: string;
   matched_lyrics: string;
 };
+
+export type Mood = "sad" | "angry" | "happy" | "chill" | "romantic" | "energetic" | "nostalgic" | "dark";
 
 export type Turn = { role: "user" | "assistant"; content: string };
 
@@ -97,4 +99,23 @@ export async function streamPlaylist(
     }
   }
   throw new Error("the stream ended without a result");
+}
+
+// the user removed a song, ask for the next best one (null if nothing is left)
+export async function replaceSong(
+  sid: string,
+  provider: Provider,
+  message: string,
+  request: Record<string, unknown>,
+  current: { song_id: number; artist: string }[],
+  dropId: number,
+): Promise<Song | null> {
+  const r = await check(
+    await fetch("/api/agent/replace", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Session-Id": sid },
+      body: JSON.stringify({ provider, message, request, current, drop_id: dropId }),
+    }),
+  );
+  return (await r.json()).song;
 }

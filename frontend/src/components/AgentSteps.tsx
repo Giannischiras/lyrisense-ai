@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Brain, Search, SlidersHorizontal, ListMusic, ShieldCheck, Loader2 } from "lucide-react";
+import { Brain, Search, SlidersHorizontal, ListMusic, ShieldCheck, Loader2, RotateCcw } from "lucide-react";
 import type { Step } from "../api";
 
 const META: Record<Step["step"], { label: string; icon: typeof Brain }> = {
@@ -8,6 +8,7 @@ const META: Record<Step["step"], { label: string; icon: typeof Brain }> = {
   relax_filters: { label: "Nothing matched, loosening filters", icon: SlidersHorizontal },
   curate: { label: "Picking songs and writing why", icon: ListMusic },
   check: { label: "Checking the picks", icon: ShieldCheck },
+  search_raw: { label: "Nothing fit, searching with your own words", icon: RotateCcw },
 };
 
 function detail(s: Step): string {
@@ -19,7 +20,7 @@ function detail(s: Step): string {
       return r ? `"${r.search_query}", ${r.size} songs${skip}` : "";
     }
     case "retrieve":
-      return `${s.candidates} candidates`;
+      return `${s.candidates} candidates${s.query ? ` for "${s.query}"` : ""}`;
     case "curate":
       return `${s.picks} picks${(s.attempt as number) > 1 ? " (second try)" : ""}`;
     case "check": {
@@ -32,10 +33,17 @@ function detail(s: Step): string {
 }
 
 export function AgentSteps({ steps, running }: { steps: Step[]; running: boolean }) {
+  const total = steps.reduce((t, s) => t + s.ms, 0);
   return (
-    <div className="glass rounded-3xl p-5">
-      <p className="mb-4 font-display text-sm font-semibold uppercase tracking-widest text-muted">What the agent did</p>
-      <ol className="space-y-3">
+    <div className="glass rounded-[24px] p-5">
+      <div className="mb-4 flex items-baseline justify-between">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">What the agent did</p>
+        {steps.length > 0 && <span className="font-mono text-xs text-muted">{(total / 1000).toFixed(1)}s</span>}
+      </div>
+      <ol className="relative space-y-4">
+        {(steps.length > 1 || running) && (
+          <span className="absolute bottom-3 left-[15px] top-3 w-px bg-gradient-to-b from-violet/60 via-pink/40 to-transparent" />
+        )}
         <AnimatePresence initial={false}>
           {steps.map((s, i) => {
             const m = META[s.step];
@@ -45,9 +53,10 @@ export function AgentSteps({ steps, running }: { steps: Step[]; running: boolean
                 key={`${s.step}-${i}`}
                 initial={{ opacity: 0, x: -12 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="flex items-start gap-3"
+                transition={{ duration: 0.35 }}
+                className="relative flex items-start gap-3"
               >
-                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet/15 text-violet">
+                <span className="relative mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-violet/30 bg-gradient-to-br from-violet/30 to-pink/20 text-white">
                   <Icon className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -58,7 +67,7 @@ export function AgentSteps({ steps, running }: { steps: Step[]; running: boolean
                   <p className="truncate text-xs text-muted">{detail(s)}</p>
                   {Array.isArray(s.llm_calls) &&
                     (s.llm_calls as { model: string; ms: number }[]).map((c, j) => (
-                      <p key={j} className="truncate font-mono text-[10px] text-violet/80">
+                      <p key={j} className="truncate font-mono text-[10px] text-pink/80">
                         LLM {c.model} {(c.ms / 1000).toFixed(1)}s
                       </p>
                     ))}
@@ -68,13 +77,15 @@ export function AgentSteps({ steps, running }: { steps: Step[]; running: boolean
           })}
         </AnimatePresence>
         {running && (
-          <li className="flex items-center gap-3 text-sm text-muted">
-            <span className="flex h-7 w-7 items-center justify-center">
-              <Loader2 className="h-4 w-4 animate-spin text-pink" />
+          <li className="relative flex items-center gap-3 text-sm text-muted">
+            <span className="relative flex h-8 w-8 items-center justify-center">
+              <span className="absolute inset-0 animate-ping rounded-xl bg-pink/30" />
+              <Loader2 className="relative h-4 w-4 animate-spin text-pink" />
             </span>
             working...
           </li>
         )}
+        {!running && steps.length === 0 && <li className="text-sm text-muted">nothing yet</li>}
       </ol>
     </div>
   );
