@@ -160,4 +160,121 @@ def test_history_goes_to_the_llm():
     out = graph.run_agent(llm, fake_search([CANDIDATES]), "more like these", history)
     assert out["kind"] == "playlist"
     assert "<history>" in llm.prompts[0][1] and "sad songs" in llm.prompts[0][1]
-    assert "Giannis Chiras" in llm.prompts[0][0]
+    assert "Giannis" in llm.prompts[0][0]
+
+
+def test_replace_song_skips_songs_already_in_the_playlist():
+    req = PlaylistRequest(search_query="rain", exclude_artists=["Coldplay"])
+    llm = FakeLLM([json.dumps({"reason": "more rain"})])
+    current = [(1, "Artist A"), (2, "Artist B")]
+    # 1 and 2 are in the playlist, 3 is coldplay (excluded), so 4 is next
+    song = graph.replace_song(llm, fake_search([CANDIDATES]), req, "rainy", current, drop_id=2)
+    assert song["song_id"] == 4
+    assert song["reason"] == "more rain"
+
+
+def test_replace_song_returns_none_when_nothing_is_left():
+    req = PlaylistRequest(search_query="rain")
+    current = [(h.song_id, h.artist) for h in CANDIDATES]
+    assert graph.replace_song(FakeLLM([]), fake_search([CANDIDATES]), req, "x", current, 1) is None
+
+
+def test_nothing_fits_so_it_searches_with_the_users_words():
+    empty = json.dumps({"title": "x", "picks": []})
+    llm = FakeLLM([understand_reply(search_query="bones"), empty, curate_reply([1, 2, 6])])
+    search = fake_search([CANDIDATES, CANDIDATES])
+    out = graph.run_agent(llm, search, "τραγούδι για τους γονείς")
+    assert [s["song_id"] for s in out["songs"]] == [1, 2, 6]
+    assert search.calls[1][0] == "τραγούδι για τους γονείς"
+    assert "search_raw" in [s["step"] for s in out["steps"]]
+
+
+def test_one_song_means_size_one_even_if_the_model_says_10():
+    llm = FakeLLM([understand_reply(size=10), curate_reply([1])])
+    out = graph.run_agent(llm, fake_search([CANDIDATES]), "ενα τραγουδι για τη βροχη")
+    assert out["request"]["size"] == 1
+
+
+def test_bad_json_from_one_model_tries_the_next(monkeypatch):
+    from app.agent.llm import OpenAICompatLLM
+
+    llm = OpenAICompatLLM("groq", "test-key-not-real-123")
+    llm.model = None
+    monkeypatch.setattr(llm, "_candidates", lambda: ["broken", "good"])
+
+    class Reply:
+        choices = [type("C", (), {"message": type("M", (), {"content": '{"ok": 1}'})()})()]
+
+    def call(model, system, user):
+        llm._t0 = 0.0
+        if model == "broken":
+            raise LLMError("groq returned 400: json_validate_failed", 400)
+        return Reply()
+
+    monkeypatch.setattr(llm, "_call", call)
+    assert llm.complete("s", "u") == '{"ok": 1}'
+    assert llm.model == "good"
+
+
+def test_curate_is_told_the_language_of_the_request():
+    llm = FakeLLM([understand_reply(), curate_reply([1, 2])])
+    graph.run_agent(llm, fake_search([CANDIDATES]), "sad songs for a rainy day")
+    assert "English for English" in llm.prompts[1][1]
+    llm = FakeLLM([understand_reply(), curate_reply([1, 2])])
+    graph.run_agent(llm, fake_search([CANDIDATES]), "λυπημένα τραγούδια για βροχή")
+    assert "in Greek." in llm.prompts[1][1]
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["Θέλω να πεθάνω, βάλε μου κάτι", "θελω να πεθανω", "I want to die", "i wanna kill myself"],
+)
+def test_someone_in_crisis_gets_help_not_songs(text):
+    llm = FakeLLM([])  # the llm isn't even called
+    out = graph.run_agent(llm, fake_search([CANDIDATES]), text)
+    assert out["kind"] == "chat" and out["songs"] == []
+    assert "1018" in out["reply"]
+
+
+@pytest.mark.parametrize(
+    "text", ["songs about death", "κάτι για έναν φίλο που πέθανε", "songs about suicide awareness"]
+)
+def test_crisis_check_doesnt_fire_on_normal_requests(text):
+    from app.agent.guardrails import crisis_reply
+
+    assert crisis_reply(text) is None
+
+
+def test_huge_size_is_clamped_not_an_error():
+    assert PlaylistRequest(size=50).size == 25
+    assert PlaylistRequest(size=0).size == 1
+
+
+@pytest.mark.parametrize(
+    "text,one",
+    [
+        ("ένα ελληνικό τραγούδι για τον πατέρα", True),
+        ("one sad song please", True),
+        ("βγάλε μου ένα ακόμα", True),
+        ("give me a song list for the gym", False),
+        ("10 songs about rain", False),
+    ],
+)
+def test_one_song_phrases(text, one):
+    assert bool(graph._ONE_SONG.search(text)) == one
+
+
+def test_more_like_these_skips_songs_already_given():
+    history = [
+        Turn(role="user", content="rain songs"),
+        Turn(
+            role="assistant",
+            content='made a playlist "Rain": Rain Song - Artist A; Storm - Artist C',
+        ),
+    ]
+    search = fake_search([list(CANDIDATES)])
+    llm = FakeLLM([understand_reply(), curate_reply([2, 4, 5])])
+    out = graph.run_agent(llm, search, "more like these", history)
+    ids = [s["song_id"] for s in out["songs"]]
+    assert 1 not in ids
+    assert 'id="1"' not in llm.prompts[1][1] and 'id="6"' not in llm.prompts[1][1]

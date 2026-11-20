@@ -7,6 +7,7 @@ it's never read from env or a file.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -28,6 +29,9 @@ PREFERRED = {
         "openai/gpt-oss-120b",
         "llama-3.3-70b-versatile",
         "openai/gpt-oss-20b",
+        # each groq model has its own daily token limit, so a third one keeps the app
+        # working after the gpt-oss ones run out
+        "qwen/qwen3.8-27b",
         "llama-3.1-8b-instant",
     ],
     "gemini": [
@@ -41,6 +45,15 @@ PREFERRED = {
 }
 ANTHROPIC_MODEL = "claude-opus-5-5"
 PROVIDERS = (*OPENAI_COMPAT, "anthropic")
+
+
+# which model worked for which key, so we don't list the models again on every message
+# (that took ~7s on groq). the key is stored only as a short hash, and only in memory
+_MODEL_CACHE: dict[str, str] = {}
+
+
+def _cache_key(provider: str, api_key: str) -> str:
+    return f"{provider}:{hashlib.sha256(api_key.encode()).hexdigest()[:16]}"
 
 
 class LLMError(RuntimeError):
@@ -100,7 +113,8 @@ class OpenAICompatLLM:
         from openai import OpenAI
 
         self.name = provider
-        self.model = model
+        self._cache = _cache_key(provider, api_key)
+        self.model = model or _MODEL_CACHE.get(self._cache)
         self._client = OpenAI(
             api_key=api_key, base_url=OPENAI_COMPAT[provider], timeout=60, max_retries=1
         )
@@ -146,7 +160,13 @@ class OpenAICompatLLM:
                 ],
             )
         except openai.APIStatusError as e:
-            log.warning("llm error provider=%s model=%s status=%s", self.name, model, e.status_code)
+            log.warning(
+                "llm error provider=%s model=%s status=%s msg=%s",
+                self.name,
+                model,
+                e.status_code,
+                str(e.message)[:200],
+            )
             raise LLMError(
                 f"{self.name} returned {e.status_code} for {model}: {e.message}", e.status_code
             ) from e
@@ -154,9 +174,21 @@ class OpenAICompatLLM:
             raise LLMError(f"{self.name} request failed: {e}") from e
 
     def complete(self, system: str, user: str) -> str:
+        r = None
         if self.model is not None:
-            r = self._call(self.model, system, user)
-        else:
+            try:
+                r = self._call(self.model, system, user)
+            except LLMError as e:
+                # the saved model stopped working (removed or out of quota), pick again
+                bad_json = e.status == 400 and "json" in str(e).lower()
+                if bad_json:
+                    pass  # just this answer went wrong, try the other models below
+                elif e.status not in (404, 429) or _MODEL_CACHE.get(self._cache) != self.model:
+                    raise
+                else:
+                    _MODEL_CACHE.pop(self._cache, None)
+                    self.model = None
+        if r is None:
             # try models until one answers. a model can be in the list but closed for
             # new keys (404), or have no free quota left (429)
             r = None
@@ -165,10 +197,14 @@ class OpenAICompatLLM:
                 try:
                     r = self._call(m, system, user)
                     self.model = m
+                    _MODEL_CACHE[self._cache] = m
                     log.info("using model %s for %s", m, self.name)
                     break
                 except LLMError as e:
-                    if e.status not in (404, 429):
+                    # 400 with bad json = that model failed this answer (groq's
+                    # json_validate_failed), another model can still do it
+                    bad_json = e.status == 400 and "json" in str(e).lower()
+                    if e.status not in (404, 429) and not bad_json:
                         raise
                     last = e
             if r is None:

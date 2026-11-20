@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 Genre = Literal["pop", "rock", "rap", "rb", "country"]
+# the ui colors the page by this
+Mood = Literal["sad", "angry", "happy", "chill", "romantic", "energetic", "nostalgic", "dark"]
 
 
 class PlaylistRequest(BaseModel):
@@ -30,7 +32,17 @@ class PlaylistRequest(BaseModel):
     decade_from: int | None = Field(default=None, ge=1900, le=2030)
     decade_to: int | None = Field(default=None, ge=1900, le=2030)
     exclude_artists: list[str] = Field(default_factory=list, max_length=20)
-    size: int = Field(default=10, ge=3, le=25)
+    size: int = Field(default=10, ge=1, le=25)
+    mood: Mood | None = Field(default=None, description="the overall feeling of the request")
+
+    @field_validator("size", mode="before")
+    @classmethod
+    def _clamp_size(cls, v):
+        # "50 songs" -> the model sends 50, better to give 25 than fail and retry
+        try:
+            return min(max(int(v), 1), 25)
+        except (TypeError, ValueError):
+            return 10
 
 
 class Turn(BaseModel):
@@ -50,3 +62,7 @@ class CuratedPlaylist(BaseModel):
 
     title: str = Field(max_length=80)
     picks: list[Pick] = Field(max_length=40)
+
+
+class Reason(BaseModel):
+    reason: str = Field(max_length=300)

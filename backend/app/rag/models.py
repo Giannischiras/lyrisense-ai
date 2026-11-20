@@ -12,20 +12,23 @@ EMBED_MODEL = os.environ.get(
 )
 EMBED_DIM = 384
 RERANK_MODEL = os.environ.get("LYRISENSE_RERANK_MODEL", "jinaai/jina-reranker-v2-base-multilingual")
+# fastembed keeps models in the system temp folder by default, and macOS cleans that
+# every few days (lost the embedder file once and every search hung re-downloading it)
+CACHE_DIR = os.path.expanduser(os.environ.get("LYRISENSE_MODEL_CACHE", "~/.cache/lyrisense/models"))
 
 
 @lru_cache
 def _embedder():
     from fastembed import TextEmbedding
 
-    return TextEmbedding(EMBED_MODEL)
+    return TextEmbedding(EMBED_MODEL, cache_dir=CACHE_DIR)
 
 
 @lru_cache
 def _reranker():
     from fastembed.rerank.cross_encoder import TextCrossEncoder
 
-    return TextCrossEncoder(RERANK_MODEL)
+    return TextCrossEncoder(RERANK_MODEL, cache_dir=CACHE_DIR)
 
 
 def embed(texts: list[str], batch_size: int = 256) -> np.ndarray:

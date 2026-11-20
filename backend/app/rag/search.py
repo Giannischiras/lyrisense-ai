@@ -26,7 +26,9 @@ class Filters:
     exclude_artists: list[str] = field(default_factory=list)
 
     def sql(self) -> tuple[str, list]:
-        where, args = [], []
+        # the dataset has ~380 "Genius English Translations" pages (translated k-pop etc),
+        # they're not real songs by that artist so never return them
+        where, args = ["s.artist NOT LIKE %s"], ["Genius%"]
         if self.language:
             where.append("s.language = %s")
             args.append(self.language)
@@ -42,7 +44,7 @@ class Filters:
         if self.exclude_artists:
             where.append("NOT (lower(s.artist) = ANY(%s))")
             args.append([a.lower() for a in self.exclude_artists])
-        return (" AND ".join(where) or "TRUE"), args
+        return " AND ".join(where), args
 
 
 @dataclass

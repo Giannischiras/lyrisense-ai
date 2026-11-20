@@ -6,10 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.agent.graph import run_agent, stream_agent
+from app.agent.graph import replace_song, run_agent, stream_agent
 from app.agent.guardrails import MAX_USER_CHARS, GuardrailError
 from app.agent.llm import PROVIDERS, LLMError, make_llm
-from app.agent.schemas import Turn
+from app.agent.schemas import PlaylistRequest, Turn
 from app.config import get_settings
 from app.log import log, setup_logging
 from app.rag.search import Filters, search
@@ -83,7 +83,21 @@ def _search(query: str, filters: Filters, k: int):
         return search(conn, query, filters, k=k)
 
 
-def _llm_for(body: PlaylistIn, sid: str):
+class SongRef(BaseModel):
+    song_id: int
+    artist: str = Field(max_length=200)
+
+
+class ReplaceIn(BaseModel):
+    provider: Literal["groq", "gemini", "anthropic", "openai"]
+    model: str | None = Field(default=None, max_length=80)
+    message: str = Field(min_length=1, max_length=MAX_USER_CHARS)
+    request: PlaylistRequest
+    current: list[SongRef] = Field(max_length=40)
+    drop_id: int
+
+
+def _llm_for(body: PlaylistIn | ReplaceIn, sid: str):
     assert body.provider in PROVIDERS
     try:
         key = vault.get_key(sid, body.provider)
@@ -128,3 +142,21 @@ def make_playlist(body: PlaylistIn, x_session_id: str = Header()) -> dict:
         raise HTTPException(422, str(e)) from e
     except LLMError as e:
         raise HTTPException(502, f"the language model failed: {e}") from e
+
+
+@app.post("/agent/replace")
+def replace(body: ReplaceIn, x_session_id: str = Header()) -> dict:
+    """swap one song the user didn't like for the next best match"""
+    llm = _llm_for(body, x_session_id)
+    try:
+        song = replace_song(
+            llm,
+            _search,
+            body.request,
+            body.message,
+            [(c.song_id, c.artist) for c in body.current],
+            body.drop_id,
+        )
+    except LLMError as e:
+        raise HTTPException(502, f"the language model failed: {e}") from e
+    return {"song": song}
