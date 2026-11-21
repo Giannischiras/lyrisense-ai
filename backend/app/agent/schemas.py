@@ -32,6 +32,11 @@ class PlaylistRequest(BaseModel):
     decade_from: int | None = Field(default=None, ge=1900, le=2030)
     decade_to: int | None = Field(default=None, ge=1900, le=2030)
     exclude_artists: list[str] = Field(default_factory=list, max_length=20)
+    artists: list[str] = Field(
+        default_factory=list,
+        max_length=5,
+        description="only if they want songs BY these artists, names in latin letters",
+    )
     size: int = Field(default=10, ge=1, le=25)
     mood: Mood | None = Field(default=None, description="the overall feeling of the request")
 

@@ -6,6 +6,7 @@ each result also has the chunk that matched best and why it was picked
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass, field
 
 from pgvector.psycopg import register_vector
@@ -24,6 +25,7 @@ class Filters:
     decade_from: int | None = None
     decade_to: int | None = None
     exclude_artists: list[str] = field(default_factory=list)
+    artists: list[str] = field(default_factory=list)  # "songs by X"
 
     def sql(self) -> tuple[str, list]:
         # the dataset has ~380 "Genius English Translations" pages (translated k-pop etc),
@@ -35,16 +37,39 @@ class Filters:
         if self.genres:
             where.append("s.genre = ANY(%s)")
             args.append(self.genres)
+        # by year, so "2010 to 2015" doesn't bring 2018. decade_to=1990 means the whole 90s
         if self.decade_from is not None:
-            where.append("s.decade >= %s")
+            where.append("coalesce(s.year, s.decade) >= %s")
             args.append(self.decade_from)
         if self.decade_to is not None:
-            where.append("s.decade <= %s")
-            args.append(self.decade_to)
+            end = self.decade_to + 9 if self.decade_to % 10 == 0 else self.decade_to
+            where.append("coalesce(s.year, s.decade) <= %s")
+            args.append(end)
+        if self.artists:
+            # whole words, so "Adele" doesn't match "Marie Madeleine". the surname alone
+            # also counts ("Παπακωνσταντίνου" -> the model writes Papakonstantinou)
+            names = {n for a in self.artists for n in _name_variants(a)}
+            where.append("(" + " OR ".join(["s.artist ~* %s"] * len(names)) + ")")
+            args.extend(rf"\m{_flex(n)}\M" for n in sorted(names))
         if self.exclude_artists:
             where.append("NOT (lower(s.artist) = ANY(%s))")
             args.append([a.lower() for a in self.exclude_artists])
         return " AND ".join(where), args
+
+
+def _name_variants(artist: str) -> list[str]:
+    artist = artist.strip()
+    if not artist:
+        return []
+    last = artist.split()[-1]
+    return [artist, last] if len(last) >= 5 and last != artist else [artist]
+
+
+def _flex(name: str) -> str:
+    """greek surnames come with or without the final s (Vissi/Vissis, Remos/Remo) depending on
+    how the model writes them, so the last s is optional"""
+    base = name[:-1] if name.lower().endswith("s") and len(name) > 4 else name
+    return re.escape(base) + ("s?" if base != name or base[-1:].lower() in "aeiouy" else "")
 
 
 @dataclass

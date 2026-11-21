@@ -278,3 +278,84 @@ def test_more_like_these_skips_songs_already_given():
     ids = [s["song_id"] for s in out["songs"]]
     assert 1 not in ids
     assert 'id="1"' not in llm.prompts[1][1] and 'id="6"' not in llm.prompts[1][1]
+
+
+def test_artist_filter_matches_whole_words_and_surname():
+    from app.rag.search import Filters
+
+    where, args = Filters(artists=["Vasilis Papakonstantinou"]).sql()
+    assert "s.artist ~* %s" in where
+    assert r"\mPapakonstantinous?\M" in args and r"\mVasilis\ Papakonstantinous?\M" in args
+
+
+def test_greek_surname_matches_with_or_without_the_final_s():
+    import re as _re
+
+    from app.rag.search import _flex
+
+    for written in ["Vissis", "Vissi"]:
+        pat = _re.compile(
+            rf"\m{_flex(written)}\M".replace(r"\m", r"\b").replace(r"\M", r"\b"), _re.I
+        )
+        assert pat.search("Anna Vissi")
+
+
+def test_an_explicit_count_beats_a_song():
+    assert graph._COUNT.search("I need a song for every mood, give me 10")
+    assert not graph._COUNT.search("ένα τραγούδι για τη βροχή")
+
+
+def test_decade_to_on_a_round_year_means_the_whole_decade():
+    from app.rag.search import Filters
+
+    _, args = Filters(decade_from=1990, decade_to=1990).sql()
+    assert args[-2:] == [1990, 1999]
+    _, args = Filters(decade_from=2010, decade_to=2015).sql()
+    assert args[-1] == 2015
+
+
+def test_clean_artist_drops_the_lyrics_prefix():
+    from app.ingest import clean_artist
+
+    assert clean_artist("Burn Lyrics - Phillipa Soo") == "Phillipa Soo"
+    assert clean_artist("Adele") == "Adele"
+
+
+def test_understand_knows_the_provider_and_doesnt_claim_gpt4():
+    llm = FakeLLM([json.dumps({"intent": "chat", "reply": "hi"})])
+    graph.run_agent(llm, fake_search([]), "ποιο μοντέλο είσαι;")
+    assert "(fake)" in llm.prompts[0][0] and "{provider}" not in llm.prompts[0][0]
+
+
+def test_qwen_gets_a_max_tokens_under_its_per_minute_limit():
+    from app.agent.llm import OpenAICompatLLM
+
+    llm = OpenAICompatLLM("groq", "test-key-not-real-123")
+    sent = {}
+
+    def fake_create(**kw):
+        sent.update(kw)
+        raise RuntimeError("stop")
+
+    llm._client.chat.completions.create = fake_create
+    with pytest.raises(RuntimeError):
+        llm._call("qwen/qwen3.8-27b", "s", "u")
+    assert sent["max_tokens"] <= 1000
+
+
+def test_too_long_message_gets_a_short_error():
+    from app.main import app
+
+    r = TestClient(app).post("/agent/playlist", json={"message": "x" * 600, "provider": "groq"})
+    assert r.status_code == 422 and r.json() == {"detail": "message too long (max 500 characters)"}
+
+
+def test_lyric_quote_drops_the_search_header_and_cuts_at_a_word():
+    h = hit(
+        9,
+        "The Sea",
+        "HAEVN",
+        "The Sea by HAEVN (pop, 2018): Sunrays touch the coastline " + "warm " * 60,
+    )
+    q = graph._lyric_quote(h)
+    assert q.startswith("Sunrays touch") and q.endswith("…") and "warm…" in q

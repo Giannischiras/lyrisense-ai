@@ -108,6 +108,12 @@ def complete_json[T: BaseModel](llm: LLM, system: str, user: str, model: type[T]
         return parse_json(llm.complete(system, retry), model)
 
 
+# groq's free qwen allows 1000 output tokens per minute. without max_tokens groq asks for
+# the model's full limit and every call fails with "Request too large", so the fallback
+# never worked once the gpt-oss quota ran out
+MAX_OUTPUT = {"qwen/qwen3.8-27b": 1000}
+
+
 class OpenAICompatLLM:
     def __init__(self, provider: str, api_key: str, model: str | None = None) -> None:
         from openai import OpenAI
@@ -149,8 +155,10 @@ class OpenAICompatLLM:
         import openai
 
         self._t0 = time.perf_counter()
+        extra = {"max_tokens": MAX_OUTPUT[model]} if model in MAX_OUTPUT else {}
         try:
             return self._client.chat.completions.create(
+                **extra,
                 model=model,
                 temperature=0.3,
                 response_format={"type": "json_object"},

@@ -45,6 +45,14 @@ _ONE_SONG = re.compile(
     re.IGNORECASE,
 )
 
+# "give me 10", "είκοσι τραγούδια": an explicit count wins over "a song" in the same message
+_COUNT = re.compile(
+    r"\b\d{1,3}\b|\b(two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty|"
+    r"δύο|δυο|τρία|τρια|τέσσερα|πέντε|έξι|επτά|εφτά|οχτώ|οκτώ|εννιά|δέκα|δεκα|δεκαπέντε|"
+    r"είκοσι|εικοσι)\b",
+    re.IGNORECASE,
+)
+
 IDENTITY = """You are Lyrisense, an AI that understands song lyrics.
 - Your name: lyrics + sense. You read what songs are really saying, not just their words.
 - Who made you: Giannis (in Greek "Γιάννης") built you as his AI engineering project.
@@ -53,6 +61,8 @@ IDENTITY = """You are Lyrisense, an AI that understands song lyrics.
   whose lyrics match it, from about 52,000 songs (English and Greek; pop, rock, rap, r&b,
   country). You search the lyrics by meaning, pick the best ones and say why each fits,
   quoting the lines that matched. Soon you will also save the playlist to Spotify.
+- Which AI model you run on: the one from the API key the user brought ({provider}). Don't
+  claim to be GPT-4 or any other specific model.
 - What you can't do (say it honestly if asked): you don't listen to the audio, so you know
   what a song says, not how it sounds (tempo, energy, melody).
 - How you work (if asked): a LangGraph agent. An LLM understands the request, a hybrid search
@@ -74,7 +84,18 @@ intent "playlist": they want songs or a playlist (also follow ups like "more lik
   Translate faithfully. Greek is often typed without accents or in greeklish, so read every
   word carefully: "xorismos"/"χωρισμος" = breakup, "goneis"/"γονεις" = parents,
   "mana"/"μανα" = mother, "ksenitia" = living abroad, far from home.
-  Only set language, genres, decades or exclude_artists if the user asked for them.
+  Only set language, genres, decades, artists or exclude_artists if the user asked for them.
+  artists: when they want songs BY someone ("τραγούδια του Παπακωνσταντίνου", "Adele
+  songs"), the name in latin letters as it's usually written ("Vasilis Papakonstantinou").
+  Use the artist's real stage name as it is written in Latin letters: "της Βίσση" ->
+  "Anna Vissi" (της = a woman), "του Ρέμου" -> "Antonis Remos". You CAN search by artist,
+  never say you can't.
+  "no rap" / "χωρίς ραπ": genres = every other genre (pop, rock, rb, country).
+  Occasions (wedding, funeral, gym, party, study): describe what fitting lyrics say, e.g.
+  gym -> "pushing harder, never give up, strength", first dance -> "forever, devotion, you
+  and me", play me something -> "good vibes, feeling alive".
+  Quoted lyrics ("the song that goes '...'"): intent playlist, size 1, search_query = the
+  quoted words exactly, so we find the real song in the database.
   Writing in Greek does NOT mean they want only Greek songs: set language "el" only if they
   say Greek songs (ελληνικά), "en" only if they say English (αγγλικά).
   size: how many songs they want ("a song" / "ένα τραγούδι" = 1, default 10).
@@ -83,6 +104,10 @@ intent "playlist": they want songs or a playlist (also follow ups like "more lik
 If the user says they want to die, hurt themselves or can't go on, use intent "chat": reply
 with care, tell them to talk to someone they trust or a crisis line (Greece: 1018), and
 offer songs about getting through hard times. Never send songs about suicide.
+If they then accept that offer ("ναι", "yes"), use intent "playlist" with search_query
+"hope, getting through hard times, you are not alone, keep going" and mood "chill".
+If they ask you to WRITE a song or lyrics, use intent "chat": say you don't write songs,
+you find real ones, and offer to find songs about that.
 intent "chat": greetings, questions about you, thanks, small talk, anything else.
   Then write your answer in reply, as Lyrisense. Leave the search settings empty.
 The latest message is inside <request> tags and earlier messages inside <history>.
@@ -97,6 +122,8 @@ not fit (for "songs about my mother", a rap line that uses "μάνα" as a curse
 mother), and a nearby theme does not fit either (a love breakup is not the death of a
 friend). For a mood or a vibe ("happy, I want to dance", "road trip", "something chill"),
 songs whose lyrics carry that feeling are enough, so you can usually fill the list.
+Occasions (a wedding, a funeral, the gym, a party) work like moods: songs that fit the moment
+are enough, they don't need to name it. For "songs by <artist>", any song of theirs fits.
 When the request lists several things ("trucks and beer", "summer and the sea"), a song
 about one of them or the whole scene fits; it doesn't need every word (for "country songs
 about trucks and beer", a song about drinking with friends on a dirt road fits).
@@ -156,10 +183,11 @@ def build_agent(llm: LLM, search_fn: SearchFn):
             if care:
                 req = PlaylistRequest(intent="chat", reply=care)
             else:
-                req = complete_json(llm, UNDERSTAND_PROMPT, user, PlaylistRequest)
+                system = UNDERSTAND_PROMPT.replace("{provider}", llm.name)
+                req = complete_json(llm, system, user, PlaylistRequest)
             if req.intent == "playlist" and not req.search_query.strip():
                 req.search_query = text  # the model forgot it, search with their words
-            if req.intent == "playlist" and _ONE_SONG.search(text):
+            if req.intent == "playlist" and _ONE_SONG.search(text) and not _COUNT.search(text):
                 req.size = 1  # models sometimes miss this and send 10
         filters = _filters(req)
         return {
@@ -203,11 +231,13 @@ def build_agent(llm: LLM, search_fn: SearchFn):
         # got nothing back, so drop the filters except language and excluded artists
         t0 = time.perf_counter()
         f = state["filters"]
-        relaxed = Filters(language=f.language, exclude_artists=f.exclude_artists)
+        relaxed = Filters(language=f.language, exclude_artists=f.exclude_artists)  # no artists
         return {
             "filters": relaxed,
             "relaxed": True,
-            "steps": _step(state, "relax_filters", t0, note="no results, dropped genre/decade"),
+            "steps": _step(
+                state, "relax_filters", t0, note="no results, dropped genre/decade/artist"
+            ),
         }
 
     def curate(state: AgentState) -> AgentState:
@@ -218,8 +248,15 @@ def build_agent(llm: LLM, search_fn: SearchFn):
             f"({h.genre}, {h.year}): {untrusted(h.snippet)}</song>"
             for h in state["candidates"]
         ]
+        earlier = [t.content for t in state.get("history", []) if t.role == "user"]
+        context = (
+            f"(a follow up to their earlier request: {untrusted(earlier[-1], 200)}; "
+            f"together they mean: {req.search_query})\n"
+            if earlier
+            else ""
+        )
         user = (
-            f"Request: {untrusted(state['user_text'], 500)}\n"
+            f"Request: {untrusted(state['user_text'], 500)}\n{context}"
             f"Pick {req.size} songs. {_write_in(state['user_text'])}\n\n"
             "Candidates:\n" + "\n".join(lines)
         )
@@ -252,7 +289,7 @@ def build_agent(llm: LLM, search_fn: SearchFn):
                 "genre": by_id[p.song_id].genre,
                 "year": by_id[p.song_id].year,
                 "reason": p.reason,
-                "matched_lyrics": untrusted(by_id[p.song_id].snippet, 160),
+                "matched_lyrics": _lyric_quote(by_id[p.song_id]),
             }
             for p in result.kept
         ]
@@ -379,6 +416,18 @@ def _write_in(text: str) -> str:
     )
 
 
+def _lyric_quote(h: Hit, limit: int = 170) -> str:
+    """the 'song' chunks start with "Title by Artist (genre, year): " for the search, the ui
+    only wants the lyrics. cut at a word, not in the middle of one"""
+    text = untrusted(h.snippet, 400)
+    head = f"{untrusted(h.title, 80)} by "
+    if text.startswith(head) and "): " in text[:200]:
+        text = text.split("): ", 1)[1]
+    if len(text) > limit:
+        text = text[:limit].rsplit(" ", 1)[0].rstrip(",.;:") + "…"
+    return text
+
+
 def _already_given(history: list[Turn]) -> str:
     """the ui sends earlier playlists as 'made a playlist "x": Title - Artist; ...'"""
     return " ; ".join(
@@ -393,6 +442,7 @@ def _filters(req: PlaylistRequest) -> Filters:
         decade_from=req.decade_from,
         decade_to=req.decade_to,
         exclude_artists=req.exclude_artists,
+        artists=list(req.artists),
     )
 
 

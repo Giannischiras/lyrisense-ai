@@ -1,9 +1,10 @@
 import json
 from typing import Literal
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.agent.graph import replace_song, run_agent, stream_agent
@@ -21,6 +22,25 @@ settings = get_settings()
 setup_logging()
 setup_tracing()
 app = FastAPI(title="Lyrisense API", version="0.1.0")
+
+
+@app.exception_handler(RequestValidationError)
+async def bad_request(_: Request, exc: RequestValidationError) -> JSONResponse:
+    # pydantic's default 422 is a list of dicts that also echoes the whole input back.
+    # the ui shows `detail` as text, so send one short sentence instead
+    errors = exc.errors()
+    on_message = [e for e in errors if e.get("loc", [""])[-1] == "message"]
+    first = (on_message or errors or [{}])[0]
+    field = first.get("loc", ["", ""])[-1]
+    if field == "message" and first.get("type") == "string_too_long":
+        msg = f"message too long (max {MAX_USER_CHARS} characters)"
+    elif field == "message":
+        msg = "the message is empty"
+    else:
+        msg = f"bad request: {field} {first.get('msg', '')}".strip()
+    return JSONResponse(status_code=422, content={"detail": msg})
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
