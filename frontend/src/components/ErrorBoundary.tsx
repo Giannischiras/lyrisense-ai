@@ -18,7 +18,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
       <div className="glow-bg flex min-h-full items-center justify-center p-6">
         <div className="glass max-w-lg rounded-3xl p-8 text-center">
           <h1 className="font-display text-2xl font-bold">Something broke</h1>
-          <p className="mt-3 break-words font-mono text-xs text-red-300">{this.state.error.message}</p>
+          <p className="mt-3 break-words font-mono text-xs text-red-700">{this.state.error.message}</p>
           <button
             onClick={() => location.reload()}
             className="mt-6 rounded-2xl bg-gradient-to-r from-violet via-pink to-amber px-6 py-2.5 font-display font-semibold text-ink"

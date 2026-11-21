@@ -16,7 +16,7 @@ export function Drawer({ open, onClose, children }: { open: boolean; onClose: ()
       {open && (
         <>
           <motion.div
-            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-40 bg-fg/25 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -25,7 +25,7 @@ export function Drawer({ open, onClose, children }: { open: boolean; onClose: ()
           <motion.aside
             role="dialog"
             aria-label="How I found these"
-            className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto border-l border-white/[0.07] bg-panel/95 p-5 backdrop-blur-xl"
+            className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto border-l border-fg/[0.07] bg-panel/95 p-5 backdrop-blur-xl"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -33,7 +33,7 @@ export function Drawer({ open, onClose, children }: { open: boolean; onClose: ()
           >
             <div className="mb-5 flex items-center justify-between">
               <p className="font-display text-sm font-semibold">How I found these</p>
-              <button onClick={onClose} aria-label="Close" className="cursor-pointer rounded-full p-2 text-muted transition-colors hover:bg-white/5 hover:text-white">
+              <button onClick={onClose} aria-label="Close" className="cursor-pointer rounded-full p-2 text-muted transition-colors hover:bg-fg/5 hover:text-fg">
                 <X className="h-4 w-4" />
               </button>
             </div>

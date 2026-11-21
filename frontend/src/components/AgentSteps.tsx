@@ -56,7 +56,7 @@ export function AgentSteps({ steps, running }: { steps: Step[]; running: boolean
                 transition={{ duration: 0.35 }}
                 className="relative flex items-start gap-3"
               >
-                <span className="relative mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-violet/30 bg-gradient-to-br from-violet/30 to-pink/20 text-white">
+                <span className="relative mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-violet/30 bg-gradient-to-br from-violet/30 to-pink/20 text-fg">
                   <Icon className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">

@@ -24,7 +24,7 @@ export function Logs({ lines }: { lines: LogLine[] }) {
         <div className="max-h-72 overflow-y-auto px-5 pb-4 font-mono text-[11px] leading-relaxed">
           {lines.length === 0 && <p className="text-muted">nothing yet</p>}
           {lines.map((l, i) => (
-            <div key={i} className={l.level === "error" ? "text-red-400" : "text-muted"}>
+            <div key={i} className={l.level === "error" ? "text-red-700" : "text-muted"}>
               <span className="text-pink/70">{((l.t - start) / 1000).toFixed(2).padStart(6, " ")}s</span>{" "}
               <span className="break-all whitespace-pre-wrap">{l.text}</span>
             </div>

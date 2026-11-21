@@ -4,25 +4,27 @@
   --font-display: "Unbounded", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --color-ink: #150e0c;
-  --color-panel: #1f1512;
-  --color-line: #45302a;
-  --color-muted: #c9b5ad;
-  --color-violet: #f26b83;
-  --color-pink: #ff9a8b;
-  --color-amber: #ffc187;
+  /* cream + navy + one cherry accent ("less is more, especially with accents") */
+  --color-ink: #f5efe3; /* page background, cream */
+  --color-panel: #fbf8f1;
+  --color-line: #e2d8c4;
+  --color-fg: #14213d; /* text, navy */
+  --color-muted: #556079;
+  --color-violet: #14213d; /* main color = navy */
+  --color-pink: #e01e3c; /* the accent = cherry red, use it on few things */
+  --color-amber: #34507f; /* lighter navy for gradients */
 }
 
 html, body, #root { height: 100%; }
 body {
   margin: 0;
   background: var(--color-ink);
-  color: #f7ede9;
+  color: var(--color-fg);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
-::selection { background: rgba(255, 154, 139, 0.35); }
+::selection { background: rgba(224, 30, 60, 0.18); }
 
 /* ---------- background: slow moving aurora + grain ---------- */
 .aurora {
@@ -38,12 +40,15 @@ body {
   content: "";
   position: absolute;
   inset: -50%;
-  opacity: 0.06;
+  z-index: 1;
+  /* paper texture: stronger grain, multiplied so it darkens the cream like real paper */
+  opacity: 0.11;
+  mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 /* one soft light that drifts. its colors follow the mood (set from Background.tsx) */
-@property --glow-a { syntax: "<color>"; initial-value: #f26b83; inherits: true; }
-@property --glow-b { syntax: "<color>"; initial-value: #ffc187; inherits: true; }
+@property --glow-a { syntax: "<color>"; initial-value: #e01e3c; inherits: true; }
+@property --glow-b { syntax: "<color>"; initial-value: #34507f; inherits: true; }
 .aurora { transition: --glow-a 1.6s ease, --glow-b 1.6s ease; }
 .glow {
   position: absolute;
@@ -54,8 +59,8 @@ body {
   border-radius: 9999px;
   background: radial-gradient(circle at 35% 40%, var(--glow-a), transparent 60%),
     radial-gradient(circle at 70% 60%, var(--glow-b), transparent 60%);
-  filter: blur(80px);
-  opacity: 0.32;
+  filter: blur(90px);
+  opacity: 0.16;
   will-change: transform;
   animation: drift1 30s ease-in-out infinite;
 }
@@ -63,7 +68,8 @@ body {
 
 /* ---------- text ---------- */
 .gradient-text {
-  background: linear-gradient(90deg, var(--color-violet), var(--color-pink), var(--color-amber), var(--color-pink), var(--color-violet));
+  /* mostly navy, the cherry only passes by as a small shine */
+  background: linear-gradient(90deg, var(--color-violet) 0%, var(--color-amber) 35%, var(--color-violet) 60%, var(--color-pink) 72%, var(--color-violet) 84%, var(--color-violet) 100%);
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
@@ -74,9 +80,9 @@ body {
 
 /* ---------- surfaces ---------- */
 .glass {
-  background: linear-gradient(180deg, rgba(32, 19, 15, 0.72), rgba(17, 10, 8, 0.72));
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 20px 50px -20px rgba(0, 0, 0, 0.6);
+  background: linear-gradient(180deg, rgba(255, 253, 248, 0.82), rgba(251, 247, 239, 0.82));
+  border: 1px solid rgba(20, 33, 61, 0.09);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 20px 50px -24px rgba(20, 33, 61, 0.25);
   backdrop-filter: blur(18px);
 }
 
@@ -93,7 +99,7 @@ body {
   z-index: -1;
   border-radius: inherit;
   padding: 1px;
-  background: conic-gradient(from var(--angle), transparent 0deg, var(--color-violet) 60deg, var(--color-pink) 120deg, var(--color-amber) 170deg, transparent 230deg);
+  background: conic-gradient(from var(--angle), transparent 0deg, var(--color-violet) 60deg, var(--color-amber) 120deg, var(--color-pink) 170deg, transparent 230deg);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -105,20 +111,34 @@ body {
 @keyframes spin-border { to { --angle: 360deg; } }
 
 .btn-gradient {
-  background: linear-gradient(110deg, var(--color-violet), var(--color-pink) 55%, var(--color-amber));
+  background: linear-gradient(110deg, var(--color-violet), var(--color-amber));
   background-size: 160% 100%;
   transition: background-position 300ms ease, box-shadow 300ms ease, opacity 200ms;
-  box-shadow: 0 8px 30px -8px rgba(255, 154, 139, 0.55);
+  box-shadow: 0 8px 24px -10px rgba(20, 33, 61, 0.55);
 }
-.btn-gradient:hover:not(:disabled) { background-position: 100% 0; box-shadow: 0 10px 40px -6px rgba(255, 154, 139, 0.75); }
+.btn-gradient:hover:not(:disabled) { background-position: 100% 0; box-shadow: 0 10px 30px -8px rgba(20, 33, 61, 0.6); }
 
 /* little cover art for a playlist */
 .cover {
   background:
-    radial-gradient(circle at 25% 20%, rgba(255, 193, 135, 0.9), transparent 45%),
-    radial-gradient(circle at 80% 30%, rgba(255, 154, 139, 0.95), transparent 50%),
-    radial-gradient(circle at 40% 90%, rgba(242, 107, 131, 1), transparent 60%),
-    #3a1c18;
+    radial-gradient(circle at 75% 25%, rgba(224, 30, 60, 0.9), transparent 40%),
+    radial-gradient(circle at 25% 80%, rgba(52, 80, 127, 1), transparent 60%),
+    #14213d;
+}
+
+/* the record that slides out of the cover */
+.vinyl {
+  background:
+    radial-gradient(circle, var(--color-pink) 0 13%, #0d1528 14% 17%, transparent 18%),
+    repeating-radial-gradient(circle, #0d1528 0 2px, #1b2846 3px 4px);
+  box-shadow: 0 6px 16px -6px rgba(20, 33, 61, 0.5);
+}
+
+/* a replaced song comes in with a soft cherry flash that fades */
+.fresh-flash { animation: fresh-flash 1.4s ease-out; }
+@keyframes fresh-flash {
+  0% { background-color: rgba(224, 30, 60, 0.14); }
+  100% { background-color: transparent; }
 }
 
 /* focus ring for buttons and links only. text fields show focus with their own border */

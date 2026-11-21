@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { KeyRound, Lock, Loader2, ArrowRight, Zap, Sparkles, Bot, Brain } from "lucide-react";
 import type { Provider } from "../api";
@@ -13,23 +13,30 @@ const PROVIDERS: { id: Provider; name: string; note: string; link: string; icon:
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
-export function Setup({ onConnect }: { onConnect: (p: Provider, key: string) => Promise<void> }) {
+export function Setup({
+  onConnect,
+}: {
+  onConnect: (p: Provider, key: string, from: { x: number; y: number }) => Promise<void>;
+}) {
   const [provider, setProvider] = useState<Provider>("groq");
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const button = useRef<HTMLButtonElement>(null);
   const chosen = PROVIDERS.find((p) => p.id === provider)!;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
+    // the page change starts from the middle of this button
+    const r = button.current?.getBoundingClientRect();
+    const from = r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : { x: innerWidth / 2, y: innerHeight / 2 };
     try {
-      await onConnect(provider, key.trim());
-      setKey("");
+      await onConnect(provider, key.trim(), from);
+      setKey(""); // stay "busy" until the page changes
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-    } finally {
       setBusy(false);
     }
   }
@@ -77,11 +84,11 @@ export function Setup({ onConnect }: { onConnect: (p: Provider, key: string) => 
                   aria-pressed={on}
                   className={`group cursor-pointer rounded-2xl border px-3 py-3.5 text-left transition-all duration-200 ${
                     on
-                      ? "border-pink/60 bg-gradient-to-br from-violet/25 to-pink/15 shadow-[0_0_30px_-8px_rgba(255,154,139,0.6)]"
-                      : "border-white/[0.07] bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]"
+                      ? "border-pink/60 bg-gradient-to-br from-violet/25 to-pink/15 shadow-[0_0_30px_-8px_rgba(224,30,60,0.3)]"
+                      : "border-fg/[0.07] bg-fg/[0.02] hover:border-fg/20 hover:bg-fg/[0.04]"
                   }`}
                 >
-                  <Icon className={`mb-2 h-4 w-4 transition-colors ${on ? "text-pink" : "text-muted group-hover:text-white"}`} />
+                  <Icon className={`mb-2 h-4 w-4 transition-colors ${on ? "text-pink" : "text-muted group-hover:text-fg"}`} />
                   <span className="block font-display text-sm font-semibold">{p.name}</span>
                   <span className="block text-xs text-muted">{p.note}</span>
                 </button>
@@ -95,7 +102,7 @@ export function Setup({ onConnect }: { onConnect: (p: Provider, key: string) => 
               (get one)
             </a>
           </label>
-          <div className="mt-2 flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-black/30 px-4 transition-colors focus-within:border-pink/60 focus-within:bg-black/40">
+          <div className="mt-2 flex items-center gap-3 rounded-2xl border border-fg/[0.08] bg-white/70 px-4 transition-colors focus-within:border-pink/60 focus-within:bg-white/90">
             <KeyRound className="h-4 w-4 shrink-0 text-muted" />
             <input
               id="key"
@@ -109,9 +116,10 @@ export function Setup({ onConnect }: { onConnect: (p: Provider, key: string) => 
             />
           </div>
 
-          {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+          {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
 
           <button
+            ref={button}
             type="submit"
             disabled={busy || key.trim().length < 8}
             className="btn-gradient mt-6 flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl py-4 font-display text-base font-bold text-ink disabled:cursor-not-allowed disabled:opacity-40"
